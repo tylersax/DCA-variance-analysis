@@ -5,8 +5,9 @@
 set -euo pipefail
 
 DEMO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Where the built demo binaries live. Override per machine:  BIN_DIR=/path/to/build/variance_demo ./run_replicas.sh
-BIN_DIR="${BIN_DIR:-/home/tyler-sax/projects/dca_m3_build/variance_demo}"
+# Where the built demo binaries live (build root: the standalone project puts them there, not in a
+# variance_demo/ subdir). Override per machine:  BIN_DIR=/path/to/build ./run_replicas_feas4.sh
+BIN_DIR="${BIN_DIR:-/home/tsax10/dca/build}"
 OUT_DIR="${DEMO_DIR}/runs_feas4"
 TEMPLATE="${DEMO_DIR}/fe_as_variance_input_4x4.template.json"
 
