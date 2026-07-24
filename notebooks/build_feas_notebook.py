@@ -67,10 +67,14 @@ print('\nReplicas independent — variance estimates trustworthy.')""")
 
 md(r"""## 4. Symmetrization orbits — derived (measured) vs the declared 2-op cap
 
-Orbits defined empirically: entries the ON arm collapses to equal values are orbit-mates. The declared
-{id,C4} group could average any entry over at most 2 images (2 ops), so **2 is the reduction ceiling**
-the declaration could ever reach; every derived orbit of size > 2 is beyond it.""")
-code(r"""der,labels=L.orbits_from_on(Gon)
+Orbits defined empirically: entries the ON arm collapses to the same value **up to sign** are orbit-mates.
+The sign is not cosmetic — the interband channel is *odd* under some of the derived ops, so those members
+are averaged in with a −1 and the ON arm returns equal magnitudes of opposite sign. Matching on value
+alone splits that single orbit into two ± classes and reports n=4 for what is really an n=8 orbit.
+
+The declared {id,C4} group could average any entry over at most 2 images (2 ops), so **2 is the reduction
+ceiling** the declaration could ever reach; every derived orbit of size > 2 is beyond it.""")
+code(r"""der,labels,sgns=L.orbits_from_on(Gon)
 from collections import Counter
 print('DERIVED orbit sizes:', dict(sorted(Counter(len(g) for g in der).items())))
 print('declared cap: 2 ops -> <=2x on any entry\n')
@@ -114,12 +118,12 @@ sig = np.abs(Fon_all[:,:,bd]).mean()
 def is_null(g):
     return np.abs(Fon_all[:,:,g]).mean() < 1e-4*sig
 rows=[]; n_null=0
-for g in der:
+for g,sg in zip(der,sgns):
     if is_null(g):
         n_null+=1; continue
     n=len(g); r=pooled_ratio(g)
     if not np.isfinite(r): n_null+=1; continue
-    lo,hi=boot_ci(g); rho=L.orbit_rho_flat(Goff,g)
+    lo,hi=boot_ci(g); rho=L.orbit_rho_flat(Goff,g,sg)
     interband=all(labels[i][1]!=labels[i][2] for i in g)
     rows.append(dict(n=n,ratio=r,lo=lo,hi=hi,rho=rho,interband=interband))
 print(f'({n_null} symmetry-forced-null orbits excluded: derived group sends them to ~0)')

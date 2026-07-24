@@ -229,19 +229,33 @@ every ON file reports ops=8, every OFF ops=1; ON/OFF seed sets identical. ~50 mi
   the declared 2× ceiling with room rather than grazing it. Point estimate is well inside the old CI.
 - Independence checks pass at the tighter N=512 band (±0.087): drift +0.002, lag-1 −0.004,
   seed-proximity −0.015. Mean unbiased, mean|z|=0.67. Orbit sizes unchanged, {2:4, 4:6, 8:1, 24:1}.
-- **All 9 band-diagonal orbits now match the predicted n/(1+(n−1)ρ) to two decimals** — the whole
-  orbit spectrum, not just the headline. N=32 was too noisy to show this.
+- **All orbits match the predicted n/(1+(n−1)ρ) to two decimals** — the whole orbit spectrum, not
+  just the headline. N=32 was too noisy to show this.
 
-**Open: the two size-4 interband orbits do not fit the ρ model.** They report ρ = exactly 1.000 and
-measure 1.58 / 1.74 where the prediction gives 1.00. Unequal member variances would explain it but
-are ruled out (max/min variance = 1.00). Cause: for these two orbits the ON arm is **not** the plain
-mean of its OFF orbit-mates — relative deviation 1.3e-2, versus ~5e-12 for *every* band-diagonal
-orbit, i.e. machine precision. So the symmetrization combines interband entries with sign/phase
-structure that `orbits_from_on`'s empirical grouping flattens, and the plain-average ρ prediction
-does not apply to them. **Claim B is untouched**: its headline orbit is band-diagonal and verified an
-exact plain mean. But the two interband rows in the summary table are currently reported against a
-model that does not fit them, and that wants either a phase-aware orbit definition or an explicit
-exclusion like the size-24 null guard.
+#### Resolved: the interband orbits were an analysis artifact, not a symmetrization bug
+
+The first pass at N=512 reported **two** size-4 interband orbits with ρ = exactly 1.000, measuring
+1.58 / 1.74 where the prediction gives 1.00 — the only rows in the table that missed. Unequal member
+variances were ruled out (max/min variance = 1.00). The actual cause, established directly against
+the data:
+
+- `ON_A = −ON_B` to **1.3e-17** — the two "orbits" are exact negatives of each other;
+- `ON_A` = the **signed** mean `(ΣA − ΣB)/8` to **1.3e-11**, i.e. machine precision;
+- the plain mean of either class alone is off by 1.3e-2, and the plain mean of all 8 cancels to ~0.
+
+So there is **one size-8 interband orbit on which the interband component is odd**: half its members
+enter the average with a −1, and M3′'s imposition path reproduces that signed average exactly. The
+symmetrization code is correct — this is a second, independent demonstration that it handles a
+nontrivial representation, not just trivial band-diagonal averaging.
+
+The fault was in `orbits_from_on`, which defined orbit-mates by equality of the ON value and so split
+the signed orbit into two ± classes, handing `n=4` downstream for what is an `n=8` orbit and
+computing ρ from unsigned residuals (hence the spurious ρ=1.000: within a ± class the entries *are*
+the same quantity). Fixed by matching up to sign and returning per-member signs, which
+`orbit_rho_flat` now undoes before correlating. Result: orbit sizes {2:4, 4:4, 8:2, 24:1} (64 entries
+conserved), the two rows collapse to one **n=8 interband orbit at 1.66 [1.61, 1.72], ρ=0.546**, and
+**10/10 orbits match the ρ prediction**. Claim B's headline was never affected — its orbit is
+band-diagonal and was verified an exact plain mean throughout.
 
 ### Not done (out of scope / cost)
 - CT-INT cross-check (doesn't compile here); 8×8 headline (§8 stage 3); the size-24 interband channel

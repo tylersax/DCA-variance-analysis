@@ -34,33 +34,52 @@ def flatten_entries(G):
     return F, labels
 
 def orbits_from_on(Gon, tol=1e-9):
-    """Group flattened entries into symmetrization orbits: entries the ON arm makes equal (per
-    replica, all w). Uses replica 0 across all w as the fingerprint; merges by near-equality."""
+    """Group flattened entries into symmetrization orbits: entries the ON arm makes equal UP TO
+    SIGN (per replica, all w). Uses replica 0 across all w as the fingerprint.
+
+    The sign matters. A component that is *odd* under some derived op is averaged with a -1 on half
+    its orbit, so the ON arm collapses those members to equal magnitude and opposite sign. Matching
+    on value alone therefore splits one orbit into two +/- classes -- for FeAs 4x4 it reported two
+    n=4 interband orbits where there is really one n=8 orbit, and the n it hands downstream then
+    disagrees with the measured reduction. Verified against the data: the ON value reproduces the
+    signed mean (sum(+members) - sum(-members))/8 to ~1e-11, while the plain mean of either class
+    is off by ~1e-2. Returns the per-member sign so callers can undo it before correlating.
+    """
     F, labels = flatten_entries(Gon)
     fp = F[0]                       # (w, E) fingerprint from replica 0
     E = fp.shape[1]
     scale = np.abs(fp).mean() + 1e-30
     assigned = [-1]*E
-    groups = []
+    groups, signs = [], []
     for i in range(E):
         if assigned[i] != -1:
             continue
-        gid = len(groups); assigned[i] = gid; members = [i]
+        gid = len(groups); assigned[i] = gid; members = [i]; member_signs = [1.0]
         for j in range(i+1, E):
-            if assigned[j] == -1 and np.max(np.abs(fp[:, i] - fp[:, j])) < tol*scale:
-                assigned[j] = gid; members.append(j)
-        groups.append(members)
-    return groups, labels
+            if assigned[j] != -1:
+                continue
+            if np.max(np.abs(fp[:, i] - fp[:, j])) < tol*scale:
+                assigned[j] = gid; members.append(j); member_signs.append(1.0)
+            elif np.max(np.abs(fp[:, i] + fp[:, j])) < tol*scale:
+                assigned[j] = gid; members.append(j); member_signs.append(-1.0)
+        groups.append(members); signs.append(member_signs)
+    return groups, labels, signs
 
 def replica_variance_flat(G):
     F, _ = flatten_entries(G)
     return F.var(axis=0, ddof=1).real     # (w, E)
 
-def orbit_rho_flat(G, members):
+def orbit_rho_flat(G, members, signs=None):
+    # signs: undo the orbit's +/- structure before correlating. Without it, members that enter the
+    # symmetrization with opposite sign look anti-correlated (or, within one +/- class, spuriously
+    # perfectly correlated), and the n/(1+(n-1)rho) prediction no longer describes the orbit.
     if len(members) < 2:
         return np.nan
     F, _ = flatten_entries(G)
-    res = F[:, :, members] - F[:, :, members].mean(axis=0, keepdims=True)
+    X = F[:, :, members]
+    if signs is not None:
+        X = X * np.asarray(signs, dtype=float)[None, None, :]
+    res = X - X.mean(axis=0, keepdims=True)
     cs = []
     for a in range(len(members)):
         for b in range(a+1, len(members)):
