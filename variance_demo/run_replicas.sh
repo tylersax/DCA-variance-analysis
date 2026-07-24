@@ -17,6 +17,14 @@ CONCURRENCY="${2:-3}"  # simultaneous runs (each ~4 threads)
 
 mkdir -p "${OUT_DIR}/inputs" "${OUT_DIR}/on" "${OUT_DIR}/off"
 
+# Each replica already runs 4 solver threads (2 walkers + 2 accumulators), and CONCURRENCY is sized
+# to cores/4 on that basis. OpenBLAS otherwise spawns a pool of nproc threads *per replica*: at
+# concurrency 32 on a 128-core box that was 4000+ threads and not one replica finished in 8 minutes,
+# against 85s standalone. Cap the BLAS pool so the intended thread budget actually holds.
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
+export MKL_NUM_THREADS="${MKL_NUM_THREADS:-1}"
+
 # Build the shared seed list once and record it.
 SEEDS=()
 for ((i=1; i<=N; i++)); do SEEDS+=( $(( STRIDE * i )) ); done
@@ -36,6 +44,17 @@ export OUT_DIR TEMPLATE BIN_DIR
 # Launch all (arm,seed) jobs through xargs -P for bounded concurrency.
 for arm in on off; do
   for seed in "${SEEDS[@]}"; do echo "${arm} ${seed}"; done
-done | xargs -P "${CONCURRENCY}" -I{} bash -c 'run_one $0 $1' {}
+done | xargs -P "${CONCURRENCY}" -I{} bash -c 'run_one $0 $1' {} &
+XARGS_PID=$!
+# Killing this script alone leaves the xargs pool orphaned to init, still working through the rest of
+# the seed list (learned the hard way). Tear the pool and its replicas down explicitly on interrupt.
+cleanup() {
+  kill "${XARGS_PID}" 2>/dev/null || true
+  pkill -P "${XARGS_PID}" 2>/dev/null || true
+  pkill -f "^${BIN_DIR}/" 2>/dev/null || true
+}
+trap cleanup INT TERM
+wait "${XARGS_PID}"
+trap - INT TERM
 
 echo "done: $(ls ${OUT_DIR}/on/*.hdf5 | wc -l) ON, $(ls ${OUT_DIR}/off/*.hdf5 | wc -l) OFF files"

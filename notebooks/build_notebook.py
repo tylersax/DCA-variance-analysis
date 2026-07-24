@@ -152,7 +152,7 @@ ax.plot(xx, xx, '--', color='#888', label='ideal  y = n  (ρ=0)')
 ax.axhline(1.0, color='#c44', lw=1, label='null  y = 1  (ρ=1)')
 ax.set_xlabel('orbit size $n_{\\mathrm{orbit}}(k)$'); ax.set_ylabel(r'$\mathrm{Var}_{\rm off}/\mathrm{Var}_{\rm on}$')
 ax.set_title('Variance reduction tracks orbit structure, ρ-limited'); ax.set_xticks([1,2,3,4])
-ax.legend(fontsize=8); fig.tight_layout(); fig.savefig('figures/money_plot.png', dpi=130)
+ax.legend(fontsize=8); fig.tight_layout(); fig.savefig('../figures/money_plot.png', dpi=130)
 for r in rows: print(f"  n={r['n']} ratio={r['ratio']:.3f} [{r['lo']:.2f},{r['hi']:.2f}]")
 plt.show()""")
 
@@ -178,7 +178,7 @@ ax.plot(lim, lim, '--', color='#888', label='y = x')
 ax.set_xlim(lim); ax.set_ylim(lim)
 ax.set_xlabel(r'predicted $n/(1+(n-1)\rho)$'); ax.set_ylabel('measured ratio')
 ax.set_title('Machinery consistency'); ax.legend(fontsize=8)
-fig.tight_layout(); fig.savefig('figures/correlation_diagnostic.png', dpi=130); plt.show()""")
+fig.tight_layout(); fig.savefig('../figures/correlation_diagnostic.png', dpi=130); plt.show()""")
 
 md(r"""## 6. Bias control — the mean must not move
 
@@ -201,7 +201,7 @@ zs = z[:, sing].ravel(); zs = zs[np.isfinite(zs)]
 axes[1].hist(zs.real, bins=25, color='#caa', edgecolor='k', lw=.3)
 axes[1].set_title(f'Γ and (π,π) only: max|z|={np.abs(zs).max():.1e}')
 axes[1].set_xlabel('z')
-fig.tight_layout(); fig.savefig('figures/bias_control.png', dpi=130); plt.show()
+fig.tight_layout(); fig.savefig('../figures/bias_control.png', dpi=130); plt.show()
 print(f'singleton bias max|z| = {np.abs(zs).max():.2e}  (identity op => exactly 0)')""")
 
 md(r"""## 7. Frequency dependence — should be flat
@@ -224,7 +224,7 @@ h,l = ax.get_legend_handles_labels(); seen={}; H=[]; Ll=[]
 for hi,li in zip(h,l):
     if li not in seen: seen[li]=1; H.append(hi); Ll.append(li)
 ax.legend(H, Ll, fontsize=8, ncol=3)
-fig.tight_layout(); fig.savefig('figures/frequency_dependence.png', dpi=130); plt.show()
+fig.tight_layout(); fig.savefig('../figures/frequency_dependence.png', dpi=130); plt.show()
 # |G| profile to justify the wpk=127 choice
 print('|G| peak at frequency index', np.abs(Goff.mean(0)).mean(1).argmax())""")
 

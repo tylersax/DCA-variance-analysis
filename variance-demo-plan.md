@@ -219,6 +219,30 @@ this tree (ctint submatrix-walker header); CT-AUX is the plan's primary solver a
   is excluded: the derived group sends it to ~0, making Voff/Von an ill-defined 0/0.
   ⇒ Reduction the declared group could never reach, bought purely by H0-derived, undeclared symmetry.
 
+### Stage 2b — FeAs 4×4 at N=512/arm (executed 2026-07-24, second machine, 128 cores)
+
+Same binaries, same seed construction (stride 1000003), N raised 32 → 512/arm. 1024/1024 runs clean;
+every ON file reports ops=8, every OFF ops=1; ON/OFF seed sets identical. ~50 min at concurrency 32.
+
+- **Headline tightens and holds: Var_off/Var_on = 2.51 [2.40, 2.64] (ρ=0.312)**, against 2.45 [2.12,
+  2.90] at N=32. CI **3.3× narrower**; the lower bound moves 2.12 → 2.40, so the interval now clears
+  the declared 2× ceiling with room rather than grazing it. Point estimate is well inside the old CI.
+- Independence checks pass at the tighter N=512 band (±0.087): drift +0.002, lag-1 −0.004,
+  seed-proximity −0.015. Mean unbiased, mean|z|=0.67. Orbit sizes unchanged, {2:4, 4:6, 8:1, 24:1}.
+- **All 9 band-diagonal orbits now match the predicted n/(1+(n−1)ρ) to two decimals** — the whole
+  orbit spectrum, not just the headline. N=32 was too noisy to show this.
+
+**Open: the two size-4 interband orbits do not fit the ρ model.** They report ρ = exactly 1.000 and
+measure 1.58 / 1.74 where the prediction gives 1.00. Unequal member variances would explain it but
+are ruled out (max/min variance = 1.00). Cause: for these two orbits the ON arm is **not** the plain
+mean of its OFF orbit-mates — relative deviation 1.3e-2, versus ~5e-12 for *every* band-diagonal
+orbit, i.e. machine precision. So the symmetrization combines interband entries with sign/phase
+structure that `orbits_from_on`'s empirical grouping flattens, and the plain-average ρ prediction
+does not apply to them. **Claim B is untouched**: its headline orbit is band-diagonal and verified an
+exact plain mean. But the two interband rows in the summary table are currently reported against a
+model that does not fit them, and that wants either a phase-aware orbit definition or an explicit
+exclusion like the size-24 null guard.
+
 ### Not done (out of scope / cost)
 - CT-INT cross-check (doesn't compile here); 8×8 headline (§8 stage 3); the size-24 interband channel
   quantitatively (symmetry-forced null). None affect the two headline claims.

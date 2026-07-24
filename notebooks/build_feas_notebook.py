@@ -7,7 +7,7 @@ def code(s): C.append(new_code_cell(s))
 
 md(r"""# FeAs variance-reduction demo — claim B: *derived symmetry that was never declared*
 
-**CT-AUX, FeAs (two-band), Nc = 16 (4×4), one DCA iteration.** N = 32 paired independent runs/arm,
+**CT-AUX, FeAs (two-band), Nc = 16 (4×4), one DCA iteration.** N = 512 paired independent runs/arm,
 shared explicit-integer seed list (prime stride 1000003).
 
 FeAs is the project's actual story. Its model **declares** `FeAsPointGroup` = {identity, C4} = **2 ops**.
@@ -92,11 +92,16 @@ code(r"""def pooled_ratio(m):
     return (Voff[:,m].mean()/von) if von>0 else np.nan
 def boot_ci(m,nb=1000,seed=0):
     rng=np.random.default_rng(seed); Fo,_=L.flatten_entries(Goff); Fn,_=L.flatten_entries(Gon)
+    # Slice the orbit BEFORE resampling. Fo[b][:,:,m] would materialise all E entries of every
+    # resample and then throw most away; at N=512 that alone costs ~20 min per notebook. Same
+    # bootstrap index set b is applied to both arms -- the arms are seed-paired, so this is a
+    # PAIRED bootstrap and the ON/OFF correlation must stay in the interval.
+    Fo_m=Fo[:,:,m]; Fn_m=Fn[:,:,m]
     v=[]
     for _ in range(nb):
         b=rng.integers(0,Nrep,Nrep)
-        dn=Fn[b][:,:,m].var(0,ddof=1).real.mean()
-        if dn>0: v.append(Fo[b][:,:,m].var(0,ddof=1).real.mean()/dn)
+        dn=Fn_m[b].var(0,ddof=1).real.mean()
+        if dn>0: v.append(Fo_m[b].var(0,ddof=1).real.mean()/dn)
     return (np.percentile(v,2.5),np.percentile(v,97.5)) if v else (np.nan,np.nan)
 
 # Null-orbit guard. Some derived orbits (all interband here) are symmetry-forced to ~0: the derived
@@ -134,7 +139,7 @@ ax.scatter([],[],marker='o',color='#2c6fbb',label='derived orbit size ≤ 2')
 ax.set_xlabel('derived orbit size $n$'); ax.set_ylabel(r'$\mathrm{Var}_{\rm off}/\mathrm{Var}_{\rm on}$')
 ax.set_title('FeAs 4×4: derived group reduces variance beyond the declared ceiling')
 ax.set_xticks([1,2,3,4,6,8]); ax.legend(fontsize=8,loc='upper left')
-fig.tight_layout(); fig.savefig('figures/feas4_money_plot.png',dpi=130); plt.show()
+fig.tight_layout(); fig.savefig('../figures/feas4_money_plot.png',dpi=130); plt.show()
 for r in sorted(rows,key=lambda x:x['n']):
     tag='interband' if r['interband'] else 'band-diag'
     print(f"  n={r['n']:>2} ({tag}) ratio={r['ratio']:.2f} [{r['lo']:.2f},{r['hi']:.2f}] rho={r['rho']:.3f}")""")
@@ -147,7 +152,7 @@ fig,ax=plt.subplots(figsize=(5,3.2))
 ax.hist(zf.real,bins=40,density=True,color='#8bb',edgecolor='k',lw=.3)
 xx=np.linspace(-4,4,100); ax.plot(xx,np.exp(-xx**2/2)/np.sqrt(2*np.pi),'r')
 ax.set_title(f'Re z, all entries  mean={zf.real.mean():.2f} std={zf.real.std():.2f}'); ax.set_xlabel('z')
-fig.tight_layout(); fig.savefig('figures/feas4_bias.png',dpi=130); plt.show()
+fig.tight_layout(); fig.savefig('../figures/feas4_bias.png',dpi=130); plt.show()
 print(f'bias: mean|z|={np.abs(zf).mean():.2f}  (imposing 6 undeclared ops does not bias the mean)')""")
 
 md(r"""## 7. Summary — the claim-B table
