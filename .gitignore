@@ -1,0 +1,8 @@
+# Replica outputs (regenerable; hundreds of MB)
+variance_demo/runs*/
+# Local python env
+.venv/
+# Build artifacts
+build*/
+*.log
+__pycache__/

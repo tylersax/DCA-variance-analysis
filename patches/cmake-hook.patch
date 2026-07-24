@@ -1,0 +1,22 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 635ecb57..c100842d 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -258,6 +258,17 @@ endif()
+ 
+ ################################################################################
+ # Build applications.
++
++# --- variance-demo (LOCAL, uncommitted; see .claude/symmetry_project/dev/variance_demo) ---
++option(DCA_WITH_VARIANCE_DEMO "Build the parked symmetrization variance-reduction demo." OFF)
++if(DCA_WITH_VARIANCE_DEMO)
++  if(NOT DEFINED DCA_VARIANCE_DEMO_DIR)
++    message(FATAL_ERROR "DCA_WITH_VARIANCE_DEMO=ON requires -DDCA_VARIANCE_DEMO_DIR=<path to dev/variance_demo>")
++  endif()
++  add_subdirectory(${DCA_VARIANCE_DEMO_DIR} ${CMAKE_BINARY_DIR}/variance_demo)
++endif()
++# --- end variance-demo ---
++
+ add_subdirectory(applications)
+ 
+ ###############################################################################
