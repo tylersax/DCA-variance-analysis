@@ -18,8 +18,11 @@ they are invisible in the aggregate 2.48; intraband carries 84.8% at `R_C = 2.13
 
 HEADROOM. `R_ideal = sum(Var) / sum(Var/m)` is the `rho = 0` ceiling for a model's ACTUAL orbit
 structure, so `efficiency = R / R_ideal` separates "small because orbits are small" from "small
-because the noise is already symmetric". Measured: square 1.035/3.053 = 33.9%; FeAs 2.156/2.894 =
-74.5%. Note square's HEADROOM IS LARGER than FeAs's -- its orbit structure is fine, its noise is the
+because the noise is already symmetric". Measured on the 16-rank runs: square 1.035/3.053 = 33.9%;
+FeAs 2.156/2.894 = 74.5%. (Those two are single 16-rank draws. At 64 ranks x 3 seeds above each
+model's depth floor: square 34.1% +/- 0.1%, FeAs 87.5% +/- 3.1% -- see m_scaling.py and
+03_m_scaling.ipynb. The comparison below is unaffected, and if anything understated.)
+Note square's HEADROOM IS LARGER than FeAs's -- its orbit structure is fine, its noise is the
 problem. The models differ in the symmetry-structure of their noise, not in their symmetry structure.
 
 SCOPE: everything here is a property of Var(G). Observable-level variance (Sigma, susceptibilities,

@@ -25,6 +25,7 @@
 
 #include "dca/io/hdf5/hdf5_writer.hpp"
 #include "dca/io/json/json_reader.hpp"
+#include "dca/parallel/util/get_workload.hpp"
 #include "dca/phys/domains/cluster/cluster_symmetry.hpp"
 #include "dca/util/git_version.hpp"
 
@@ -69,6 +70,24 @@ int main(int argc, char** argv) {
   auto G_i = qmc_solver.local_G_k_w(/*symmetrize=*/false);
   const int local_size = static_cast<int>(G_i.size());  // nu*nu*nk*nw complex entries
   const std::complex<double> sign_i = qmc_solver.local_accumulated_sign();  // per-rank phase
+
+  // DEPTH BOOKKEEPING. The input's "measurements" is the TOTAL over ranks: every solver takes it
+  // through parallel::util::getWorkload (see mci_parameters.hpp, `local_meas = measurements/mpi_size`),
+  // so each rank actually runs total/n_ranks. Recording only the input number mislabels the depth by
+  // a factor of n_ranks and silently rescales the whole M axis. Record both, taking the per-rank
+  // figure from the same getWorkload the solver used rather than re-deriving it.
+  const int measurements_total = parameters.get_measurements().back();
+  const int measurements_per_rank = dca::parallel::util::getWorkload(measurements_total, concurrency);
+  // getWorkload hands the first (total % n_ranks) ranks one extra measurement. Unequal depth breaks
+  // the "every rank is one iid sample" premise the variance estimator rests on, so refuse it.
+  if (measurements_total % n_ranks != 0) {
+    if (is_root)
+      std::cerr << "[symm_variance] ERROR: measurements (" << measurements_total
+                << ") is not divisible by n_ranks (" << n_ranks
+                << "); ranks would run at unequal depth and the per-rank samples would not be"
+                   " identically distributed.\n";
+    return 2;
+  }
 
   // Gather the raw per-rank buffers to rank 0 as interleaved doubles (re, im contiguous per entry).
   std::vector<double> gathered;
@@ -117,6 +136,7 @@ int main(int argc, char** argv) {
     std::cout << "\n[symm_variance] model=" << SYMM_VARIANCE_MODEL_LABEL
               << "  seed=" << parameters.get_seed() << "  live super-cell ops=" << n_ops
               << "  Nk=" << k_elements.size() << "  ranks=" << n_ranks
+              << "  meas/rank=" << measurements_per_rank << " (total " << measurements_total << ")"
               << "  local_size=" << local_size << '\n';
 
     dca::io::HDF5Writer writer;
@@ -127,7 +147,8 @@ int main(int argc, char** argv) {
     writer.execute("seed", parameters.get_seed());
     writer.execute("n_ops", n_ops);
     writer.execute("n_ranks", n_ranks);
-    writer.execute("measurements_per_rank", parameters.get_measurements().back());
+    writer.execute("measurements_total", measurements_total);
+    writer.execute("measurements_per_rank", measurements_per_rank);
     writer.execute("local_size", local_size);
     writer.execute("k_elements", k_elements);
     writer.close_group();

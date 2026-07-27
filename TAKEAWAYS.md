@@ -19,12 +19,21 @@ capitalization alone to disambiguate in prose — name the scope.
 They are related exactly by `R = 1 / sum_C (w_C / R_C)` with `w_C` the class share of raw variance —
 a **harmonic** mean, so `R` is pinned by the worst well-populated class and always sits below the
 best orbits. FeAs, concretely: individual `m=8` orbits reach `r = 5.12` and `4.56`; the `m=8` *class*
-gives `R_C = 4.83`; the aggregate is `R = 2.48` (full) / `2.16` (non-null), dragged down by the
-intraband class at `R_C = 2.13` carrying 84.8% of the variance.
+gives `R_C = 4.83`; the aggregate is `R = 2.48`, dragged down by the intraband class at `R_C = 2.13`
+carrying 84.8% of the variance.
 
-Two related quantities:
-- `R_ideal = sum(Var) / sum(Var/m)` — the `rho = 0` ceiling for a model's actual orbit structure.
-- `efficiency = R / R_ideal` — how much of the available reduction is actually captured.
+**`R` is the single headline number, and it is summed over ALL entries (full support).** That is the
+reduction a user actually experiences: run unsymmetrized and you genuinely carry every entry,
+including the symmetry-forbidden ones, and their noise propagates into everything downstream. One
+number, no qualifier.
+
+Two internal quantities — useful, **not for external reporting**:
+- **Non-null `R`** drops the symmetry-forced-zero entries. Exactly `R_full = R_non-null/(1 - w_null)`
+  with `w_null` the forced-null share of raw variance, so it adds precisely one fact: `w_null`. Use it
+  when the *structure* of the noise is the point (§4b), especially across models, where `w_null`
+  varies (FeAs 38% of entries; square none) and would otherwise absorb part of a cross-model trend.
+- `R_ideal = sum(Var)/sum(Var/m)` and `efficiency = R/R_ideal` — the `rho = 0` ceiling and the share
+  of it captured. Definable only on the non-null support. A development diagnostic.
 
 ---
 
@@ -42,10 +51,76 @@ on a leadership-class machine is the same as at 10^4 on a workstation.
 **Practical corollary:** precision on `R` is governed by the number of independent samples (ranks),
 not by run depth. Cheap to measure, and the measurement transfers to any production scale.
 
-*Caveat:* assumes each sample is in the CLT/asymptotic regime — measurements past thermalization and
-well beyond the autocorrelation time. If `M` sits below the autocorrelation scale, the noise structure
-(hence `ρ`, hence `R`) could drift with `M`. This is exactly what the M-scaling control tests, and it
-matters most at large beta where autocorrelation times grow.
+*Caveat — now measured, not assumed.* The cancellation requires each rank's sample to be in the
+CLT/asymptotic regime. The M-scaling control (64 ranks, 3 seeds, `m ∈ {4…4096}` per rank) confirms
+`R` is flat in depth **above a model-dependent floor**, and finds that the floor is set by different
+mechanisms in the two models — see §1a. Below the floor `R` is biased, and the bias is **upward**, so
+a too-shallow run flatters symmetrization rather than penalizing it.
+
+## 1a. The depth floor is real, and a sign problem sets it — not the autocorrelation time
+
+Two distinct ways a per-rank sample can fail to be asymptotic, one found in each model:
+
+- **square/D4 at β=1 — autocorrelation-limited, floor ≈ 64 measurements/rank.** `R` measures ≈1.11 at
+  `m=4` against ≈1.04 asymptotically; every `4→16` step drifts significantly, and from `m ≳ 64` every
+  paired step is flat across all three seeds. *Why upward:* a single CT-AUX configuration is not
+  symmetric. A rank that has averaged only a handful of them still carries raw configuration-level
+  asymmetry — pure symmetry-**breaking** noise, exactly what `P` removes in full. It self-averages
+  away *within* each rank as `m` grows, and the mechanism diagnostics track it: mate-`ρ` on the `m=2`
+  orbits climbs 0.65 → 0.85, within-shell real-space correlation 0.74 → 0.90, then both plateau.
+- **FeAs at β=5 — sign-limited, floor ≳ 1000 measurements/rank.** `G_i = ⟨sign·M⟩_i/⟨sign⟩_i` is a
+  ratio with a **stochastic denominator**, and FeAs has `⟨sign⟩ ≈ 0.25`. At `m ≤ 64` several of 64
+  ranks accumulate a sign of **exactly zero**, making `G_i` literally `0/0`. Even at `m=256`, where
+  every rank is finite, one rank can carry an 18× outlier and single-handedly set `ΣVar`. The
+  estimator goes **heavy-tailed well before it goes undefined**, which is the dangerous part: nothing
+  in the output announces it.
+
+**The practical rule, and it cuts against the obvious one:** precision on `R` comes from ranks, but
+the *sign* floor does not. Adding ranks at fixed shallow depth makes it **worse** — more draws, more
+chances one of them has a near-zero denominator. Depth per rank has to clear the floor first; only
+then do ranks buy precision.
+
+**Above the floor, `R` is flat** — FeAs was pushed a further 4x to `m=16384` and `4096 -> 16384` is
+flat on both seeds tested. The values that survive this, replacing the single-run numbers everywhere
+else in this file (per-seed means over all runs above each floor, +/- the standard error over 3 base
+seeds):
+
+| model | depth | **`R`** | *non-null (internal)* | *efficiency (internal)* |
+|---|---|---|---|---|
+| square / D4, beta=1 | `m >= 64`/rank | **1.041 +/- 0.003** | 1.041 +/- 0.003 | 34.1% +/- 0.1% |
+| FeAs 2-band, beta=5 | `m >= 1024`/rank | **3.17 +/- 0.14** | 2.69 +/- 0.11 | 87.5% +/- 3.1% |
+
+**FeAs's move from the previously quoted 2.48 is sampling noise, not the depth floor.** `R` is
+statistically flat in depth from `m=256` through `m=16384` (per-depth means 3.19, 3.33, 3.04, 3.07),
+and the committed run was not contaminated (outlier index 2.13, worst rank sign 0.12). It was just
+imprecise: four disjoint 16-rank blocks of one 64-rank sample give `R` = 2.86, 2.96, 2.82, 3.40
+against 3.36 for all 64. The old interval `[2.13, 3.51]` contains 3.17, so **the shift is not
+statistically significant** — 2.48 was a low draw. The depth floor governs estimator *safety*, not
+bias in `R`.
+
+Why FeAs is so much noisier than square at equal rank count: `sum Var` is dominated by a few
+high-variance entries and the sign denominator makes each rank's `G` heavy-tailed, so the ~36%
+per-entry error of a 16-sample variance barely averages down. Square's 16-rank interval is +/-1.6%.
+
+**Where the error bar comes from matters.** Comparing the mean bootstrap-over-ranks SE against the
+sample SD of `R` across base seeds at fixed depth: square gives ratios 0.5–1.6, straddling 1, so the
+rank bootstrap is well calibrated there. FeAs gives **1.39, 1.43, 1.90** — all above 1, i.e. the rank
+bootstrap is **optimistic**, consistent with the heavy-tailed sign denominator that a resample of 64
+ranks cannot see. With 3 seeds an SD is itself ~50% uncertain, so this is a signal rather than a
+settled factor, but the reporting rule follows anyway: **for a model with a sign problem, quote `R`
+from across-seed scatter, not from the rank bootstrap.**
+
+**A free contamination detector.** The identity `r = m/[1+(m-1)rho]` reproduces measured `r` to three
+decimals at depth. Where the sign outliers bite it visibly fails (FeAs seed 12345 at `m=256`:
+measured `r = 4.85` against predicted `5.50`, one `m=4` orbit even showing `rho < 0`). The prediction
+assumes every pair within an orbit shares a single `rho`; one outlier rank makes the pairwise
+correlations heterogeneous and breaks that. **Divergence between measured and predicted `r` flags a
+contaminated run** — worth checking on every new model.
+
+**Consequence for the β ladder.** `⟨sign⟩` falls with β, so the depth floor *rises* with β
+independently of the autocorrelation time. The floor must be re-established at every β, and the same
+measurement that certifies it also supplies the sign data needed to separate the two competing
+effects on `ρ` (§4c).
 
 ## 2. The ceiling is the orbit size `m`, not `sqrt(m)`
 
@@ -131,14 +206,20 @@ The interband entries — carrying the distinctive multi-orbital physics — get
 **2%** of the variance, so they are invisible in the aggregate 2.48. Same by orbit size: `m=8`
 reaches `R_C = 4.83` on 4.4% of variance while `m=2` carries 35% at 1.76.
 
-**Headroom.** `R_ideal = sum(Var)/sum(Var/m)` is the `rho=0` ceiling for a model's ACTUAL orbit
-structure, so **efficiency = R / R_ideal** separates "small because orbits are small" from "small
-because the noise is symmetric":
-
-| | `R` (non-null) | `R_ideal` | efficiency |
-|---|---|---|---|
-| square | 1.035 | **3.053** | **33.9%** |
-| FeAs | 2.156 | **2.894** | **74.5%** |
+> **Headroom — an internal diagnostic, do not put this in a talk.** `R_ideal = sum(Var)/sum(Var/m)`
+> is the `rho=0` ceiling for a model's ACTUAL orbit structure, and **efficiency = R / R_ideal**
+> separates "small because orbits are small" from "small because the noise is symmetric". It earns
+> its keep for deciding *what to do next* about a model, but it needs a paragraph of setup to
+> interpret and it is defined only on the non-null support, so it does not belong in external
+> reporting. Kept here because the conclusion it supports (next paragraph) does.
+>
+> | | `R` (non-null) | `R_ideal` | efficiency |
+> |---|---|---|---|
+> | square | 1.035 | **3.053** | **33.9%** |
+> | FeAs | 2.156 | **2.894** | **74.5%** |
+>
+> *(single-run values; at proper depth — see §1a — square is 34.1% +/- 0.1% and FeAs
+> **87.5% +/- 3.1%**, so the qualitative gap below is if anything understated.)*
 
 **Square's headroom is HIGHER than FeAs's.** Its orbit structure is fine (78% of variance in `m=4`
 orbits); it simply captures a third of what is available, while FeAs captures three quarters.
@@ -146,9 +227,14 @@ orbits); it simply captures a third of what is available, while FeAs captures th
 This CORRECTS the natural assumption that multi-orbital wins via bigger orbits. On a variance-weighted
 basis it does not: FeAs's `m=8` orbits carry too little variance to matter, and its many `m=2` orbits
 pull `R_ideal` back down to roughly square's level. FeAs wins on two different things — **much lower
-rho** (75% vs 34% efficiency) and **forced nulls** (13% of variance annihilated, square has none).
+rho** (75% vs 34% efficiency) and **forced nulls** (13-16% of variance annihilated, square has none).
 Sharper statement: *the models differ in the symmetry-structure of their noise, not in their symmetry
 structure.*
+
+Note the forced-null half of that now shows up **directly in the headline**, since `R` is reported on
+the full support: FeAs's `3.17` already contains the 16% of its raw variance that symmetry drives to
+exactly zero. That is the intended behaviour — it is noise a user really would have carried — but it
+is also why a cross-model comparison of `R` alone is not purely a statement about noise correlation.
 
 ## 4c. Symmetrization pays off most where the physics is most interesting  ← lead with this
 
@@ -191,8 +277,14 @@ So two mechanisms push `rho` in OPPOSITE directions as beta rises: growing corre
 it down, a worsening sign problem pushes it up. Which dominates, and where the crossover sits, is
 unknown and is one of the more interesting things the beta ladder can establish. Mapping the boundary
 of where symmetrization pays off — *including* the regimes where it collapses — is a more useful
-result for a practitioner than an unqualified endorsement would be. No sign problem at beta=1
-(per-rank signs exactly equal), so there is no data on this yet.
+result for a practitioner than an unqualified endorsement would be.
+
+*Status of the evidence:* square at beta=1 is sign-free (per-rank `<sign>` = 1 exactly), but **FeAs at
+beta=5 has `<sign>` ~ 0.25** — a real sign problem, surfaced by the M-scaling control (§1a). So the
+channel is live in a model already in hand, and the per-rank sign distribution is now instrumented on
+every run. What is still missing is the *controlled* comparison: FeAs's `rho` is low (~0.06) despite
+that sign problem, but FeAs differs from square on four axes at once, so this says nothing yet about
+the sign channel's strength. Isolating it needs the beta ladder on a single model.
 
 ## 4d. Scope note: we measure variance in `G`; observables may differ
 
@@ -235,6 +327,13 @@ Because `P` is deterministic and linear, one set of raw per-rank samples yields 
 denominator, so the ratio is paired and fluctuations cancel.
 - Paired: **16 ranks** gave FeAs `R = 2.48`, with per-orbit `r` within 2% of prediction.
 - Unpaired ensemble (prior prototype): ~**128 runs per arm** for `R = 2.45 [2.12, 2.90]` (+/-16%).
+
+**Correction — the pairing buys accuracy per sample, not precision from nowhere.** Bootstrapping over
+the 16 ranks of that paired run gives `R = 2.48 [2.13, 3.51]`, which is *wider* than the 128-run
+unpaired interval, not tighter. The honest claim is per-sample cost: the paired design reaches
+comparable precision from ~16 samples instead of ~256 (two arms x 128), and needs no special
+no-symmetry build. **It does not license quoting `R = 2.48` from 16 ranks** — that point estimate was
+always sitting inside a factor-1.6 interval. See §1a for the separate depth requirement.
 
 The built-in null control is exact: singleton orbits (`m=1`, where `P` is the identity) return
 `r = 1` with deviation **0.000e+00** — not `1.0 +/- something`.

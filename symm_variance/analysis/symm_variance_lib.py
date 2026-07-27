@@ -49,6 +49,19 @@ class Run:
 
         self.E = self.P.shape[0]
         assert self.E == nb * nb * nk, (self.E, nb, nk)
+        self._vec_cache = None
+
+    @property
+    def vec(self):
+        """The per-rank raw samples in P's (b0,b1,k) convention: (n_rank, nw, ns, E).
+
+        Cached: `_to_vec` is a Python-level scatter and every variance/orbit query needs the same
+        array, so rebuilding it per call dominates the runtime on a ladder of runs. `G_raw` is never
+        mutated after load, so the cache cannot go stale.
+        """
+        if self._vec_cache is None:
+            self._vec_cache = self._to_vec(self.G_raw)
+        return self._vec_cache
 
     # ---- flatten a spin-diagonal (b0,b1,k) block to the P convention -------------------------------
     def _to_vec(self, G):
@@ -90,7 +103,7 @@ class Run:
     # ---- variance ratios (real & imag independently, over the rank axis) ---------------------------
     def variance_ratios(self):
         """Returns dict with raw/sym per-entry variances and the ratio r, all shaped (nw, ns, E)."""
-        vec = self._to_vec(self.G_raw)                # (R, nw, ns, E)
+        vec = self.vec                                # (R, nw, ns, E)
         vsym = self.apply_P(vec)                      # (R, nw, ns, E)
         vr = vec.real.var(0, ddof=1) + 1j * vec.imag.var(0, ddof=1)
         vs = vsym.real.var(0, ddof=1) + 1j * vsym.imag.var(0, ddof=1)
@@ -123,8 +136,7 @@ class Run:
         """Mean pairwise noise correlation between sign-aligned orbit-mates, pooled over ranks, w, s."""
         if len(members) < 2:
             return np.nan
-        vec = self._to_vec(self.G_raw)                       # (R, nw, ns, E)
-        X = vec[..., members] * np.asarray(signs)[None, None, None, :]
+        X = self.vec[..., members] * np.asarray(signs)[None, None, None, :]
         res = X - X.mean(0, keepdims=True)
         cs = []
         for a in range(len(members)):
