@@ -25,6 +25,7 @@ their raw ladders live in scratch and are not committed.
 | `m_scaling.py` | Depth control: `R` vs measurements-per-rank, bootstrap-over-ranks CIs, a **paired** CI on the step-to-step `ΔR`, sign-health diagnostics, and the across-seed cross-check on those CIs. Run directly on a ladder directory: `python m_scaling.py <dir> --out summary.json`. |
 | `seed_ensemble.py` | Precision: the headline `R` and its interval from many **independent base seeds** at one fixed depth, plus a paired depth check, an across-whole-runs oracle, and the contamination gate. Run directly: `python seed_ensemble.py <dir> --deep <deeper_dir> --out summary.json`. |
 | `beta_ladder.py` | Temperature axis: `R`, `ρ`, per-orbit `r` and the sign diagnostics across a β ladder, one seed ensemble per rung. Carries the two controls the axis needs — a check that the sign channel stays off, and an `r`-vs-ω check, since a fixed frequency count means the absolute window shrinks as β grows. Run directly: `python beta_ladder.py <ladder_root> --out summary.json`. |
+| `bath_drift.py` | Bath axis (ROADMAP 3e): `R` at every DCA iteration of a real `DcaLoop`, so the bare-bath convention can be checked against the bath a production run actually samples. Reports the **paired within-seed** drift (iterations are serially dependent; ranks are matched streams), the cost-weighted mean over iterations, the bath's own step size per iteration, and — with `--ref` — the coarse-graining gap between the loop's iteration 0 and the single-iteration driver. Run directly: `python bath_drift.py <drift_root> --ref <ref_dir> --out summary.json`. |
 | `validate.py` | Command-line version of the ladder: `python validate.py ../runs/square_16rank.hdf5` |
 | `build_notebooks.py` | Regenerates the notebooks from source. Edit **this**, not the `.ipynb`, then re-execute. |
 
@@ -74,7 +75,9 @@ after any edit.
 
 ## Data contract
 
-Written by `symm_variance_main.inc`; see `orbit_table.hpp` for the operator.
+Written by `symm_variance_main.inc`; see `orbit_table.hpp` for the operator. `bath_drift_main.inc`
+writes the **same schema, one file per DCA iteration** (`<stem>_iter<k>.hdf5`), which is why every
+module above reads a drift iteration with no changes — it adds keys, it does not change any.
 
 ```
 metadata/{model,seed,beta,sweeps_per_measurement,warm_up_sweeps,n_ops,n_ranks,
@@ -95,6 +98,13 @@ the per-rank one. Files written before 2026-07-27 have only `measurements_per_ra
 ⚠️ `beta`, `sweeps_per_measurement` and `warm_up_sweeps` are recorded from 2026-07-28 on. Earlier
 files lack them; `m_scaling.read_beta` returns `None` there rather than guessing, and
 `beta_ladder.build` refuses such a run instead of grouping it under a β it cannot verify.
+
+⚠️ **`bath_drift_main.inc` adds** `metadata/{dca_iteration,dca_iterations_total,
+self_energy_mixing_factor,chemical_potential}` and three more `functions/`: the bath the walker
+actually sampled (`cluster_excluded_greens_function_G0_k_w`), the bare cluster `G0`
+(`free_cluster_greens_function_G0_k_w`), and `Self_Energy`. The bath is written so drift is measured
+rather than inferred from `R` — and because at `Σ=0` the loop's bath is the **coarse-grained** `G`,
+not the bare `G0` the single-iteration driver uses, a distinction nothing else in the tree exposes.
 
 ⚠️ Rung 2 (mean preservation) is only meaningful for runs made with
 `error-computation-type = NONE`. Under `JACK_KNIFE`, `finalize` writes a leave-one-out replicate into

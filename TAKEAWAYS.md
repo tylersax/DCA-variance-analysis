@@ -248,11 +248,15 @@ the bare bath, not as what a converged run experiences on every iteration.** The
 ladder varies `beta` and nothing else; a self-consistent ladder varies `beta` and `Sigma(beta)`
 together, and a monotone `R(beta)` there could not be attributed to correlation length. The gap is
 widest at the top rung — the converged 4x4 square at `beta=8` has strong AF correlations feeding back
-into the bath, where the bare problem does not. Direction is a hypothesis, not a measurement:
-self-consistency should push mate-`rho` DOWN further at fixed `beta`, the same direction as the
-measured trend, which would make this ladder a conservative floor at low T. **ROADMAP task 3 carries a
-one-off **bath-drift check** to settle it — `R` measured at every DCA iteration of a real loop
-run, which is the compute-weighted quantity a total-cost claim actually rests on (ROADMAP §3e).**
+into the bath, where the bare problem does not.
+
+**This has now been measured at that worst-case rung, and the gap is negligible (§4e).** Running a
+real `DcaLoop` for 10 iterations at `beta=8`, 8 seeds, the compute-weighted mean `R` over the
+iterations a production run performs is **`1.3422 +/- 0.0064`** against the committed bare-bath
+`1.3429 +/- 0.0088` — agreement to **0.05%**. The earlier hypothesis that self-consistency would push
+mate-`rho` further down, making this ladder a conservative floor, is **not** what happens: `R` does
+not move materially in either direction. So the `beta`-ladder numbers can be read as what a
+production run experiences, not merely as a bare-bath reference.
 
 **Why this ladder is clean, and what it therefore cannot say.** Two effects compete in general:
 growing correlation length pushes `rho` DOWN, but `G = <sign*M>/<sign>` means a denominator
@@ -481,24 +485,66 @@ covariance structure itself; anyone wanting an observable-level number can rewei
 a further reason to ship the class breakdown (§4b) rather than a lone scalar.
 
 
-## 4e. Scope note: every number here is measured at the bare bath
+## 4e. The bare bath is what a production run experiences — measured, and the caveat retires
 
-**All of it — the headline `R` values, the `beta` ladder, the class breakdowns — is measured at the
-FIRST DCA iteration, with `Sigma = 0` and the non-interacting `G0` as the bath.** The measurement
-driver calls the cluster solver directly and never instantiates a DCA loop, so the coarse-graining and
-cluster-exclusion steps that turn a converged `Sigma` into the sampled bath never run.
+**All the numbers here are measured at the BARE bath** (`G0_cluster_excluded = G0`, `Sigma = 0`): the
+measurement driver calls the cluster solver directly and never instantiates a DCA loop, so the
+coarse-graining and cluster-exclusion steps that build the sampled bath never run. `R` is therefore a
+property of a **single solver call**, while a production run makes ~10-20 of them per temperature on
+a bath rebuilt from the previous iteration's `Sigma`. What a total-compute claim depends on is the
+**cost-weighted average of `R` over the iterations actually run** — so the error in quoting the
+bare-bath number is roughly `(N-1)/N x drift`.
 
-Why it is stated rather than hidden: `R` is a property of a **single solver call** at a given
-(`beta`, bath), and a production run makes ~10-20 calls per temperature at a converged bath. The
-variance reduction applies to every one of those calls — `P` is the same operator regardless — but we
-have characterized only the first. Whether `R` at the self-consistent bath matches `R` at the bare
-bath is measurable and **not yet measured**; ROADMAP task 3 carries a two-point control.
+**That number has now been measured, and it is negligible.** Square, `beta=8` (the worst case — the
+converged 4x4 square has strong AF correlations feeding back into the bath), a real `DcaLoop` for
+**10 iterations x 8 independent base seeds x 64 ranks x 2048 measurements/rank**, undamped
+`Sigma` update:
 
-This is a different caveat from §4d and they should both appear in a writeup: §4d is about *which
-quantity* you reduce the variance of, this one is about *which problem* the solver was solving. The
-`beta` ladder (§3a) is where it bites hardest, since the bare and converged problems diverge most at
-low temperature — and, for a model with a sign problem, because `Sigma` moves `<sign>` and the sign
-channel is what decides where symmetrization stops paying.
+| quantity | `R` |
+|---|---|
+| committed bare-bath headline (32 seeds) | **1.3429 +/- 0.0088** |
+| compute-weighted mean over the 10 iterations a production run performs | **1.3422 +/- 0.0064** |
+| drift, iteration 0 -> 9 | **-0.5%**, CI `[-7.4%, +6.3%]`, unresolved |
+
+**Agreement to 0.05%.** Quoting the bare-bath `R` as what a user experiences is honest, and this
+caveat is closed rather than carried. Evidence: `runs/bath_drift_square.json`,
+`analysis/bath_drift.py`.
+
+**Two gaps, not one — and the roadmap's framing of the first was wrong.** "Bare bath" was described
+as *iteration 1 of a cold-started loop*. It is not. A real loop runs cluster exclusion before its
+first solve, and at `Sigma_cluster = 0` that computes `G0_cluster_excluded = G_k_w`, the
+**coarse-grained** cluster Green's function, not the bare `G0(K)` the driver uses. At `beta=8` the
+two baths differ by **73%** (`max|dG0|/max|G0|`) at identical `Sigma = 0`. So:
+
+- **gap A, coarse-graining (a fixed offset, not drift):** `R` = 1.3258 +/- 0.0100 at the bare `G0`
+  vs 1.3814 +/- 0.0179 at the loop's iteration 0, paired by base seed —
+  **+4.2%**, `[+0.7%, +7.7%]`, resolved. No iteration count reveals this one.
+- **gap B, self-consistency:** iteration 0 -> 9, the -0.5% above, unresolved.
+
+They have opposite signs and largely cancel, which is *why* the production average lands back on the
+committed headline. Worth stating plainly: the agreement is a partial cancellation of two effects,
+not evidence that either is individually zero.
+
+**The bath really did converge, so the flat `R` means something.** Per-iteration bath motion falls
+`1.1e-1 -> 1.8e-2 -> 3.6e-3 -> 7.5e-4` and then plateaus at `~4e-4` — that plateau is Monte-Carlo
+noise in `Sigma`, not further convergence. `<sign>` stays exactly 1.000 at every iteration (the
+interacting bath does not introduce a sign problem on square) and `mu` stays pinned at 0 by
+particle-hole symmetry, so neither is a confound. Validation rungs 1 and 2 pass on the loop path at
+both the first and the converged iteration (mean preservation to 2e-16).
+
+⚠️ **Pairing does NOT work across DCA iterations, unlike across depths.** The milestone-6 paired
+depth test works because the deeper run reuses the same chain prefix. Across iterations the walker is
+re-warmed at a changed bath every time, so by the last iteration nothing survives from the first but
+the base seed: measured `corr(R_first, R_last) = -0.17` across seeds, pairing gain **0.93x** — i.e.
+none. The resolved statement above therefore comes from the compute-weighted mean (SEM 0.48%), not
+from the paired difference (+/-7%). Do not quote the paired interval as the drift bound.
+
+**Scope, still honest.** This is one model at one temperature. FeAs at `beta=5` was *not* run — 3e's
+decision rule fixed in advance was "escalate only if square shows drift", and it does not. A model
+with a live sign problem could behave differently, since `Sigma` moves `<sign>` and the sign channel
+is what decides where symmetrization stops paying; square is sign-free precisely so the drift is
+isolated from that. This is a different caveat from §4d and both belong in a writeup: §4d is about
+*which quantity* you reduce the variance of, this one about *which problem* the solver was solving.
 
 
 ## 5. It is genuinely free, and provably unbiased

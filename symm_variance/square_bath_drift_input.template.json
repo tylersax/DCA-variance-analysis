@@ -1,0 +1,56 @@
+{
+  "physics": {
+    "beta"               : 8.,
+    "chemical-potential" : 0.
+  },
+
+  "single-band-Hubbard-model": {
+    "t" : 1.,
+    "U" : 4.
+  },
+
+  "domains": {
+    "real-space-grids": {
+      "cluster": [[4, 0],
+                  [0, 4]]
+    },
+    "imaginary-time": {
+      "sp-time-intervals": 128
+    },
+    "imaginary-frequency": {
+      "sp-fermionic-frequencies": 128
+    }
+  },
+
+  "CT-AUX": {
+    "expansion-parameter-K"      : 1.,
+    "initial-configuration-size" : 10,
+    "max-submatrix-size"         : 16
+  },
+
+  "DCA": {
+    "iterations"                : __ITERATIONS__,
+    "self-energy-mixing-factor" : 1.,
+    "dca-accuracy"              : 0.,
+    "interacting-orbitals"      : [0]
+  },
+
+  "output": {
+    "directory"    : "__OUTDIR__/",
+    "filename-dca" : "dca_loop.hdf5"
+  },
+
+  "Monte-Carlo-integration": {
+    "warm-up-sweeps"          : 200,
+    "sweeps-per-measurement"  : 2,
+    "measurements"            : __MEASUREMENTS__,
+    "error-computation-type"  : "NONE",
+    "seed"                    : __SEED__,
+    "threaded-solver": {
+      "walkers"                              : 2,
+      "accumulators"                         : 2,
+      "shared-walk-and-accumulation-thread"  : false,
+      "fix-meas-per-walker"                  : true
+    }
+  }
+}

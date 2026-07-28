@@ -1,3 +1,59 @@
+diff --git a/include/dca/phys/dca_loop/dca_loop.hpp b/include/dca/phys/dca_loop/dca_loop.hpp
+index bef3c065..193ccc00 100644
+--- a/include/dca/phys/dca_loop/dca_loop.hpp
++++ b/include/dca/phys/dca_loop/dca_loop.hpp
+@@ -15,6 +15,7 @@
+ #define DCA_PHYS_DCA_LOOP_DCA_LOOP_HPP
+ 
+ #include <cmath>
++#include <functional>
+ #include <iostream>
+ #include <stdexcept>
+ #include <string>
+@@ -82,6 +83,21 @@ public:
+   void execute();
+   void finalize();
+ 
++  // Optional per-iteration observers, both no-ops unless a driver installs them. They exist so an
++  // out-of-tree driver can sample the solver's state at every DCA iteration WITHOUT reimplementing
++  // execute() (whose body touches several private members) or making solve_cluster_problem virtual.
++  //
++  // pre_finalize_hook_ fires between the solver's integrate() and finalize(), i.e. while the raw
++  // per-rank accumulators are still live -- CtauxClusterSolver::local_G_k_w() throws once finalize()
++  // sets averaged_, so that gap is the only place a raw per-rank sample can be taken. It is the same
++  // gap the single-iteration symm_variance driver already uses.
++  //
++  // post_finalize_hook_ fires immediately after finalize(), when the averaged and symmetrized
++  // data_.G_k_w for this iteration is available. Split in two because no single point in the
++  // iteration has both the raw per-rank samples and the finalized mean.
++  std::function<void(int, MCIntegratorType&)> pre_finalize_hook_;
++  std::function<void(int)> post_finalize_hook_;
++
+ protected:
+   void adjust_chemical_potential();
+ 
+@@ -378,6 +394,11 @@ double DcaLoop<ParametersType, DcaDataType, MCIntegratorType, DIST>::solve_clust
+   if (output_file_ && output_file_->isADIOS2())
+     output_file_->flush();
+ 
++  // Raw per-rank accumulators are still live here; finalize() below averages them across ranks and
++  // trips local_G_k_w's averaged_ guard. See the hook declarations.
++  if (pre_finalize_hook_)
++    pre_finalize_hook_(DCA_iteration, monte_carlo_integrator_);
++
+   {
+     if (concurrency.id() == concurrency.first())
+       std::cout << "start Monte Carlo integration finalize.\n";
+@@ -387,6 +408,9 @@ double DcaLoop<ParametersType, DcaDataType, MCIntegratorType, DIST>::solve_clust
+     if (concurrency.id() == concurrency.first())
+       std::cout << "Monte Carlo integration finalized.\n";
+ 
++    if (post_finalize_hook_)
++      post_finalize_hook_(DCA_iteration);
++
+     return L2_Sigma_difference;
+   }
+ }
 diff --git a/include/dca/phys/dca_step/cluster_solver/ctaux/ctaux_cluster_solver.hpp b/include/dca/phys/dca_step/cluster_solver/ctaux/ctaux_cluster_solver.hpp
 index b6edbe85..f97897d8 100644
 --- a/include/dca/phys/dca_step/cluster_solver/ctaux/ctaux_cluster_solver.hpp
