@@ -208,6 +208,18 @@ def paired_drift(summary):
     base = float(np.mean(firsts)) if firsts else float("nan")
     st["R_first"] = across_seed(firsts)
     st["R_last"] = across_seed(lasts)
+    # DID PAIRING ACTUALLY BUY ANYTHING? Measured, not assumed -- and on this axis it does not.
+    # The milestone-6 paired DEPTH test works because the deeper run reuses the same chain prefix, so
+    # rank i's randomness genuinely is shared. Across DCA ITERATIONS it is not: the walker is
+    # re-warmed at a changed bath every iteration, so by the last one nothing survives from the first
+    # except the base seed. Measured here at corr = -0.17 and a gain of 0.94x (1.0 = pairing bought
+    # nothing), which is why the resolving statement below comes from `cost_weighted`, whose interval
+    # is ~15x tighter, and not from this difference.
+    if len(ds) > 1:
+        a, c = np.array(firsts), np.array(lasts)
+        st["corr_first_last"] = float(np.corrcoef(a, c)[0, 1])
+        sd_indep = float(np.hypot(a.std(ddof=1), c.std(ddof=1)))
+        st["pairing_gain"] = float(sd_indep / np.std(ds, ddof=1)) if np.std(ds, ddof=1) > 0 else float("nan")
     st["rel_to_first"] = float(st["mean"] / base) if st.get("n") and base else float("nan")
     st["n_same_sign"] = int(max((np.array(ds) > 0).sum(), (np.array(ds) < 0).sum())) if ds else 0
     # Resolved = the interval on the paired difference excludes zero. Small = the drift is within the
@@ -317,6 +329,12 @@ def report(summary, ref=None):
     L.append(f"  relative to R(first): {pd['rel_to_first']:+.2%}   "
              f"resolved={pd['resolved']}  within {DRIFT_TOLERANCE:.0%} tolerance="
              f"{pd['within_tolerance']}")
+    if "pairing_gain" in pd:
+        L.append(f"  pairing gain {pd['pairing_gain']:.2f}x (1.0 = none), "
+                 f"corr(first,last) = {pd['corr_first_last']:+.2f} -- the walker re-warms at a "
+                 f"changed bath\n  every iteration, so pairing does NOT work across iterations the "
+                 f"way it does across depths.\n  Take the resolved statement from the "
+                 f"cost-weighted mean below, whose interval is far tighter.")
     L.append("")
 
     cw = cost_weighted(summary)
