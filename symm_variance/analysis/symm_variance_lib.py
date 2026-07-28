@@ -37,6 +37,16 @@ class Run:
             self.sign = np.asarray(h["raw/sign_re"][()]) + 1j * np.asarray(h["raw/sign_im"][()])  # (R,)
             self.G_final = np.asarray(h["functions/cluster_greens_function_G_k_w"][()])  # (w,k,s1,b1,s0,b0)
             self.k_elements = np.array([np.asarray(x) for x in h["metadata/k_elements"][()]])
+            # Optional keys, each added to the driver after runs already existed. Treated as absent
+            # rather than fatal, exactly as m_scaling.read_beta does for `beta` -- the committed
+            # 16-rank runs predate all three and must keep loading.
+            self.beta = float(h["metadata/beta"][()][0]) if "metadata/beta" in h else None
+            self.mu = (float(h["metadata/chemical_potential"][()][0])
+                       if "metadata/chemical_potential" in h else None)
+            # Non-interacting cluster Hamiltonian H0(k), (k,s1,b1,s0,b0). Written by initializeH0 and
+            # never symmetrized (the stored G0_k_w IS -- dca_data.hpp:583 -- which is why the oracle
+            # in analytic_G0 rebuilds G0 from H0 rather than reading G0 back).
+            self.H0 = np.asarray(h["functions/H_DCA"][()]) if "functions/H_DCA" in h else None
 
         R = re.shape[0]
         nb, nk = self.nb, self.nk
@@ -151,6 +161,83 @@ class Run:
 
 def predicted_r(m, rho):
     return m / (1.0 + (m - 1.0) * rho)
+
+
+def projector_identities(run):
+    """Rung 1d: P must be an exact orthogonal projector onto the symmetry-invariant subspace.
+
+    Three algebraic identities, all exact to machine zero -- there is no statistics here and no
+    dependence on anything production computes:
+      P @ P == P        idempotence: symmetrizing twice is symmetrizing once
+      P == P.T          self-adjointness: the orbit average is an ORTHOGONAL projector, which is what
+                        licenses `Var(PG) <= Var(G)` entrywise and the whole r = m/[1+(m-1)rho] law
+      trace(P) == (number of non-null orbits)
+                        the rank of a projector is its trace, and the invariant subspace has exactly
+                        one dimension per non-null orbit (each orbit contributes its one symmetric
+                        combination; forced-null rows contribute an all-zero row, i.e. nothing)
+
+    This is the instrument that matters when rung 2 (agreement with production's Symmetrize::execute)
+    fails: rung 2 failing while these pass localizes the disagreement to production's imposition
+    rather than to our operator. Measured exactly 0.0 on both committed runs.
+    """
+    P = run.P
+    n_orbits = sum(1 for o in run.orbits() if not o["forced_null"])
+    idem = float(np.abs(P @ P - P).max())
+    symm = float(np.abs(P - P.T).max())
+    tr = float(np.trace(P))
+    return dict(
+        idempotence=idem,
+        symmetry=symm,
+        trace=tr,
+        n_nonnull_orbits=n_orbits,
+        trace_gap=abs(tr - n_orbits),
+        passes=bool(idem < 1e-9 and symm < 1e-9 and abs(tr - n_orbits) < 1e-9),
+    )
+
+
+def analytic_G0(run):
+    """G0(k, iw) = [(iw + mu) I - H0(k)]^-1, rebuilt from the stored H0 -- the ORACLE.
+
+    G0 is deterministic and exactly invariant under every symmetry of H0, so `P @ G0 == G0` tests our
+    derived operator against an object production never touched. This is the same oracle DCA's own
+    symmetrization characterization test uses, and it is the reason a rung-2 failure can be attributed
+    rather than merely reported.
+
+    Returns None when the run predates the H_DCA / chemical_potential driver keys.
+
+    Frequency convention matches the driver's sp-fermionic-frequency domain: nw points symmetric
+    about zero, w_n = (2n+1)*pi/beta for n = -nw/2 .. nw/2-1, ordered negative-to-positive so index
+    w0-w is the partner of w (the pairing full_symmetrize relies on).
+    """
+    if run.H0 is None or run.mu is None or run.beta is None:
+        return None
+    nb, nk, ns, nw = run.nb, run.nk, run.ns, run.nw
+    n = np.arange(-(nw // 2), nw - nw // 2)
+    w = (2.0 * n + 1.0) * np.pi / run.beta                      # (nw,)
+    G0 = np.zeros((nw, nk, ns, nb, ns, nb), dtype=complex)
+    eye = np.eye(nb)
+    for k in range(nk):
+        for s in range(ns):
+            # H0 is (k, s1, b1, s0, b0); the band matrix at fixed (k, s) is H[b0, b1] = H0[k,s,b1,s,b0]
+            H = np.array([[run.H0[k, s, b1, s, b0] for b1 in range(nb)] for b0 in range(nb)])
+            for iw in range(nw):
+                M = (1j * w[iw] + run.mu) * eye - H
+                Ginv = np.linalg.inv(M)
+                for b0 in range(nb):
+                    for b1 in range(nb):
+                        G0[iw, k, s, b1, s, b0] = Ginv[b0, b1]
+    return G0
+
+
+def g0_invariance(run):
+    """max |P @ G0_analytic - G0_analytic| / max|G0_analytic|. None if the run lacks H_DCA."""
+    G0 = analytic_G0(run)
+    if G0 is None:
+        return None
+    vec = run._to_vec(G0)
+    dev = np.abs(run.apply_P(vec) - vec).max()
+    scale = np.abs(vec).max()
+    return float(dev / scale) if scale > 0 else float("nan")
 
 
 # ---- full production symmetrization reproduced in numpy (for the mean-preservation rung) -----------

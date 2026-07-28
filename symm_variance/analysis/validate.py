@@ -1,7 +1,8 @@
 """Validation ladder for a symm_variance run. Usage: validate.py <run.hdf5> [--complex-g0]"""
 import sys
 import numpy as np
-from symm_variance_lib import Run, predicted_r, full_symmetrize
+from symm_variance_lib import (Run, predicted_r, full_symmetrize, projector_identities,
+                               g0_invariance)
 
 path = sys.argv[1]
 complex_g0 = "--complex-g0" in sys.argv
@@ -60,6 +61,30 @@ w_idx = np.arange(run.nw)
 slope = np.polyfit(w_idx, rw, 1)[0]
 print(f"\n[rung 1c] r(omega): mean={rw.mean():.3f} std={rw.std():.3f} "
       f"slope/step={slope:.2e}  (flat expected)")
+
+# ---- RUNG 1d: P is an exact orthogonal projector --------------------------------------------------
+# Pure algebra on P alone -- no statistics, no dependence on anything production computes. This is the
+# rung that carries the weight when rung 2 fails: 1d passing while 2 fails localizes the disagreement
+# to production's Symmetrize::execute rather than to our operator.
+pid = projector_identities(run)
+print(f"\n[rung 1d] P is an orthogonal projector:")
+print(f"  max|P@P - P|      = {pid['idempotence']:.3e}   (idempotence)")
+print(f"  max|P - P^T|      = {pid['symmetry']:.3e}   (self-adjoint)")
+print(f"  trace(P)          = {pid['trace']:.6f}  vs {pid['n_nonnull_orbits']} non-null orbits "
+      f"(gap {pid['trace_gap']:.3e})")
+print(f"  -> {'PASS' if pid['passes'] else 'FAIL'}")
+
+# ---- ORACLE: P leaves the deterministic analytic G0 invariant -------------------------------------
+# G0(k,iw) = [(iw+mu)I - H0(k)]^-1 is exactly invariant under every symmetry of H0, so this tests P
+# against an object production never touched. Requires the H_DCA / chemical_potential driver keys;
+# runs predating them report n/a rather than failing.
+g0_dev = g0_invariance(run)
+if g0_dev is None:
+    print("\n[oracle]  n/a -- run predates the H_DCA / chemical_potential driver keys")
+else:
+    print(f"\n[oracle]  max|P@G0_analytic - G0_analytic| / max|G0| = {g0_dev:.3e}  "
+          f"-> {'PASS' if g0_dev < 1e-12 else 'FAIL'}")
+    print("          (G0 rebuilt from H0; the STORED G0_k_w is production-symmetrized and cannot serve)")
 
 # ---- headline R (point-group), full and non-null support ------------------------------------------
 def R_over(mask_e):

@@ -1,0 +1,18 @@
+{
+  "physics": { "beta": 5, "chemical-potential": 0.0, "adjust-chemical-potential": false },
+  "Kagome-Hubbard-model": { "t": 1., "U": 2., "V": 0. },
+  "domains": {
+    "real-space-grids": { "cluster": [[4, 0], [0, 4]] },
+    "imaginary-time":      { "sp-time-intervals":        64 },
+    "imaginary-frequency": { "sp-fermionic-frequencies": 64 }
+  },
+  "CT-AUX": { "expansion-parameter-K": 1., "initial-configuration-size": 10, "max-submatrix-size": 16 },
+  "DCA": { "iterations": 1, "self-energy-mixing-factor": 0., "interacting-orbitals": [0, 1, 2] },
+  "Monte-Carlo-integration": {
+    "warm-up-sweeps": 200, "sweeps-per-measurement": 2, "measurements": __MEASUREMENTS__,
+    "error-computation-type": "NONE",
+    "seed": __SEED__,
+    "threaded-solver": { "walkers": 2, "accumulators": 2,
+      "shared-walk-and-accumulation-thread": false, "fix-meas-per-walker": true }
+  }
+}

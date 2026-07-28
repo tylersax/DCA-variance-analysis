@@ -535,6 +535,107 @@ faster for free. Hardware if needed: 4× RTX A5000 (24 GB, idle), CUDA 12.2, `-D
 `CUDA_GPU_ARCH=sm_86`; `symm_variance_setup.hpp` already selects `linalg::GPU` under `DCA_HAVE_GPU`.
 
 
+#### Progress (2026-07-28): infrastructure + gates 0–2 done, ensembles outstanding
+
+**Scope, chosen with the advisor:** four measured points at fixed **β=5** — `square_b5_c4` (keystone),
+`threeband_b5_c4`, `square_b5_c8` (cluster axis), and `kagome_b5_c4` — reusing the committed FeAs β=5
+rung as a reference rather than re-running it. `twoband_Cu` deliberately dropped: threeband's d–p
+block is a *within-model, single-axis* inequivalent-orbital control, which is better evidence than a
+whole second model differing on dispersions and filling too. **Follow-up task 4b** (below) carries the
+"push β higher" question.
+
+**What is built and verified** (`symm_variance/`, `analysis/`, manifest in
+`runs/model_sweep_manifest.json`):
+- `threeband_symm_variance` and `kagome_symm_variance` targets + templates + CMake tokens.
+- `CLUSTER` / `NW` / `MU` / `EP_P` / `U_PP` env overrides on `run_symm_variance.sh`, each verified by
+  `grep -q` after substitution. **`CLUSTER` must use `sed -z`** — square's template writes `"cluster"`
+  over two lines while FeAs's is on one, so a line-oriented sed silently misses square (new Gotcha).
+- Driver records `metadata/chemical_potential` and `functions/H_DCA` (both additive, both optional on
+  read). `H_DCA` buys the **analytic-`G0` oracle**.
+- `analysis/model_sweep.py` (manifest verification, `band_equivalence`, `band_pair_classes`,
+  `band_permutation_content`, `square_mesh` guard, `axis_pairs`, tables, `plan` command) and
+  `analysis/scout_point.py` (the gate-1 readout).
+- `validate.py` **rung 1d** (`P²=P`, `P=Pᵀ`, `trace(P)` = non-null orbit count) and the oracle.
+
+**Regression, run before the new code was trusted on new data:** `model_sweep` reproduces TAKEAWAYS
+§4c exactly on the committed runs — `n_offblock` 104 (FeAs) / 0 (square), orbits mixing blocks 10-of-10
+/ 0-of-6, band-equivalence classes `{0,1}` / `{0}` — and the harmonic reconstruction is exact
+(≤4e-16) in all three partition modes. Rung 1d is **exactly 0.0** on both, with trace 10 and 6.
+
+**Three findings that change the task's framing:**
+
+1. **Rung 2 PASSES on threeband (1.2e-15) — the expected failure did not happen.** DCA's
+   characterization test marks `ThreebandD4` with `expectedFailingReps = {k_iw, r_iw, r_tau}`, so the
+   plan was built around production's multi-band imposition disagreeing with our `P`. At nk=16 through
+   this driver it does not: production's `Symmetrize::execute` and our derive-path `P` agree to 1e-15,
+   **and** the analytic-`G0` oracle passes at 1.4e-16, so `P` is independently correct. **Threeband
+   numbers therefore need no imposition caveat** — they are both "what the symmetry buys" and "what
+   DCA delivers". The prepared caveat wording is not needed. Do not delete rung 1d or the oracle: they
+   are what makes this statement checkable rather than lucky.
+
+2. **`U_pp = 0` makes threeband measure nothing, and this is not a matter of degree.** At the repo
+   test's `U_pp = 0` the `|H_int| > 1e-3` filter leaves the p orbitals with no CT-AUX vertices, and the
+   consequence is that the p-block `G` comes out **deterministic** — across-rank σ ≈ 1e-17 against
+   |G| ≈ 1.6 — while the d–p block is identically zero in the measured `G`. Every class except d–d
+   then carries ~1e-30 of the raw variance and `R` collapses to the single-band answer (1.03–1.12
+   against square's 1.04). **The operating point is `U_pp = 2`, `μ = 3`** (μ at the p site energy),
+   measured to give 48% filling and an equivalent-orbital variance share of **0.708 vs 0.000**.
+   `U_pp = 8` diverges outright (band occupancy 28.7, `R` = nan). Symmetry is untouched by any of
+   this — the derive path gates on `H0` alone, so `P` and `n_ops` are bit-identical at any `U_pp`.
+   ⚠️ Never pair `U_pp = 0` with `interacting-orbitals: [1,2]`: empty `correlated_orbitals` is a
+   **segfault**, not an error (new Gotcha).
+
+3. **Kagome is BLOCKED by a DCA-side segfault — out of scope, not broken.** It was the only model with
+   three symmetry-equivalent orbitals and the only route to `|G| = 12`, so the diagnosis is recorded in
+   full in the manifest's `blocked_points`. Summary: the target *builds* (`KagomeHubbard<D6>` passes
+   `CanDeriveSymmetry`), but every run segfaults inside DCA's own
+   `SymmetrizeSingleParticleFunction::executeCluster`, called from `DcaData::initialize_G0()` — before
+   any driver code runs (gdb backtrace confirmed). Kagome's `flavors() = {0,1,2}` are all distinct, so
+   `set_symmetry_matrices` records band images of `-1` which are then dereferenced. **Declaring D4
+   instead of D6 does not help**, so it is the derive/record path, not the declared group. DCA's own
+   test reaches 12 derived ops only by calling `verifiedSymmetryOps(H0)` directly on a `no_symmetry<2>`
+   instantiation, which never exercises this path. Fixing it means patching DCA's symmetrization,
+   which this task scopes out. The `.cpp` and template are kept so the attempt is not repeated.
+
+**Gate-1 scouting results** (16 ranks × 512/rank, β=5, `NW=64` — **indicative only, below any floor**):
+
+| point | wall | `n_ops` | orbit sizes (non-null) | occupancy | oracle | `R` (scout) |
+|---|---|---|---|---|---|---|
+| `square_b5_c4` | 2 s | 8 | `{1:2, 2:1, 4:3}` | 1.00 of 2 | — | — |
+| `threeband_b5_c4` | 15 s | 8 | `{1:2, 2:10, 4:15, 8:4}` | 2.88 of 6 | 1.4e-16 ✓ | 3.22 |
+| `square_b5_c8` | 50 s | 8 | **`{1:2, 2:1, 4:9, 8:3}`** | 1.00 of 2 | 7.8e-16 ✓ | 1.51 |
+| `fe_as` (calibration) | 9 s | 8 | — | — | — | — |
+
+- **The 8×8 point already confirms TAKEAWAYS §6 geometrically:** three **free** `m=8` orbits appear at
+  8×8 that a 4×4 mesh cannot have (`{1:2, 2:1, 4:3}` → `{1:2, 2:1, 4:9, 8:3}`). Whether `ρ` falls with
+  cluster size still needs the ensemble.
+- **threeband's band-equivalence classes come out `[[0], [1,2]]`** — d inequivalent, p_x ~ p_y
+  equivalent — with exactly **two** realized band permutations (identity and the p_x↔p_y
+  transposition, **no d↔p**). That is the inequivalent-orbital control confirmed structurally, before
+  any statistics.
+
+**Cost calibration, measured not guessed.** `t(64 ranks × 2048/rank) / t(16 ranks × 512/rank) = 13.9`,
+pinned against FeAs's known 125 s at 64×2048 (its scout took 9 s). A 32-seed ensemble is 32× that.
+Budgets follow: square β=5 **~15 min**, threeband **~1.9 h**, square 8×8 **6.2 h at 32 seeds** — over
+the 4 h budget rule, so the manifest cuts it to **16 seeds (~3.1 h)**.
+
+**What remains: gates 3 and 4.** Floor ladders per point (`model_sweep.py plan --mode floor`), then the
+32-seed ensembles (`--mode ensemble`), then `model_sweep.py build`, notebook 06, and the TAKEAWAYS
+edits. A threeband floor ladder was started (`/home/tsax10/dca/scratch/task4_floor/`); it is
+skip-if-exists and resumable, so re-running the planned command is safe. **The build to use is
+`/home/tsax10/dca/build_task4`** (configured against this worktree); `build_symm` still targets the
+main checkout and does not have the new targets.
+
+### 4b. Push β higher on whichever model maximizes `R`  ▸ follow-up to task 4
+
+Decided with the advisor 2026-07-28: run the sweep at a common β=5 first, then push one model colder.
+**Which model is decided by the sweep's own diagnostic, not guessed now** — `model_sweep.binding_table`
+reports `1/ρ` against each point's m-ceiling. Pick the model that is still **ρ-limited** with the
+**largest m-ceiling**: there colder physics still pays *and* there is headroom to cash it, whereas a
+model already m-limited (FeAs by β=3) gains little from more β. Costs a β ladder plus per-rung floor
+ladders on one model. Note kagome — the likely winner on m-ceiling — is blocked above, so on current
+evidence this is threeband or the 8×8 square.
+
 #### Starting this task cold — what a fresh session needs (written 2026-07-28, at the close of §3e)
 
 **You can measure at the bare bath and stop there.** §3e settled that `R` does not drift across the
@@ -789,3 +890,22 @@ can exit 0 having executed nothing (Gotcha 12).
     (`src/math/random/random_utils.cpp`), so base seeds `S` and `S+1` at 64 ranks share 63/64 of
     their walker streams. Nothing warns; the runs simply look like agreeing replicates and every
     interval built from them is too narrow. Space base seeds by at least `n_ranks × n_walkers`.
+
+14. **`CanDeriveSymmetry` rejects a `no_symmetry` declaration, and it fails at COMPILE time.**
+    `derive_point_group.hpp` gates on `!is_no_symmetry<Lattice::DCA_point_group>` and
+    `orbit_table.hpp:52` static_asserts on `CanDeriveSymmetry`, so a model must be declared with
+    `D4`/`D6` even where DCA's own tests instantiate it with `no_symmetry<2>`. The declared group is
+    only an on/off switch on this path — `deriveAndPopulateRecord` installs `holohedry_pool_2D`
+    regardless — so declaring the real holohedry costs nothing and turns the derive path on.
+15. **An empty `correlated_orbitals` is a SEGFAULT, not an error.** `general_interaction.hpp:79` does
+    `rng() * correlated_orbitals.size()` and then indexes it unguarded; the `assert` that would catch
+    it is commented out. It is reached by naming only zero-`U` orbitals in `interacting-orbitals` —
+    e.g. threeband with `U_pp = 0` and `interacting-orbitals: [1,2]`.
+16. **`square_input.template.json` writes `"cluster"` over two lines while `fe_as`'s is on one.** A
+    line-oriented `sed -i -E` matches nothing on square and still exits 0, so the `CLUSTER` override
+    uses `sed -z` and verifies through `tr -d '[:space:]' | grep -q`. Only the verify catches it.
+17. **A model can pass every structural gate and still measure nothing.** Check the per-class share of
+    RAW variance (`scout_point.py`), not just `n_ops` and the orbit table. Threeband at `U_pp = 0` has
+    the right 8 ops, the right band-equivalence classes and the right orbit sizes, yet its p-block `G`
+    is deterministic to 1e-17 and every class but d–d carries ~1e-30 of the variance — so `R` is
+    silently just the single-band answer. `w` is a gate, not a report.

@@ -1,0 +1,82 @@
+{
+  "__about__": [
+    "ROADMAP task 4 -- broaden model coverage. This file is the PROVENANCE RECORD for runs that live",
+    "in uncommitted scratch: model_sweep.verify_point checks every field below against each run's own",
+    "HDF5 metadata and RAISES on mismatch, so a design point whose files say something else is caught",
+    "as a staging bug rather than silently averaged in.",
+    "Seed ranges are allocated from 2e7 upward at 1e6 per point, disjoint from seed_ensemble's default",
+    "1e6 and run_beta_ladder's 2e6 + beta*1e6. Walker streams are hash(global_id + base_seed), so",
+    "overlapping ranges would silently make every interval too narrow (Gotcha 13);",
+    "validate_manifest refuses to emit commands if any two points overlap.",
+    "Costs below are MEASURED, not guessed: the calibration constant t(64 ranks x 2048/rank) /",
+    "t(16 ranks x 512/rank) = 13.9 was pinned on 2026-07-28 against fe_as's known 125 s at 64x2048",
+    "(its scout took 9 s). A 32-seed ensemble is 32x that."
+  ],
+  "root": "/home/tsax10/dca/scratch/model_sweep",
+  "defaults": {
+    "n_ranks": 64,
+    "n_seeds": 32,
+    "stride": 10000,
+    "sweeps_per_measurement": 2,
+    "warm_up_sweeps": 200,
+    "nw": 64
+  },
+  "points": [
+    {
+      "label": "square_b5_c4",
+      "model": "square", "beta": 5, "L": 4, "nk": 16, "nb": 1, "n_ops": 8,
+      "m": 2048, "seed0": 20000000, "mesh": "square",
+      "blocks": {"band-diagonal": [0, 0, 0]},
+      "scout_seconds": 2, "est_run_seconds": 28, "est_ensemble_hours": 0.25,
+      "role": "KEYSTONE -- de-confounds temperature from band count against the FeAs beta=5 headline. Square's committed ladder is at beta in {1,2,4,8}, so beta=5 does not exist yet and without it the nb axis is three unconnected points rather than a trend."
+    },
+    {
+      "label": "threeband_b5_c4",
+      "model": "threeband", "beta": 5, "L": 4, "nk": 16, "nb": 3, "n_ops": 8,
+      "m": 4096, "seed0": 21000000, "mesh": "square", "chemical_potential": 3.0,
+      "blocks": {"dd": [0, 0, 0], "dpx": [0, 1, 0], "pxpx": [1, 1, 0], "pxpy": [1, 2, 0]},
+      "scout_seconds": 15, "est_run_seconds": 208, "est_ensemble_hours": 1.85,
+      "role": "The nb=3 point AND the inequivalent-orbital control in one run. Measured band-equivalence classes [[0],[1,2]]: d inequivalent, p_x ~ p_y equivalent, and exactly two realized band permutations (identity and the p_x<->p_y transposition, no d<->p). Requires U_pp = 2 and mu = 3 -- see the template's operating-point note; at U_pp = 0 the p-block G is deterministic and the run measures nothing."
+    },
+    {
+      "label": "square_b5_c8",
+      "model": "square", "beta": 5, "L": 8, "nk": 64, "nb": 1, "n_ops": 8,
+      "m": 2048, "seed0": 22000000, "mesh": "square", "n_seeds": 16,
+      "blocks": {"band-diagonal": [0, 0, 0]},
+      "scout_seconds": 50, "est_run_seconds": 695, "est_ensemble_hours": 3.1,
+      "role": "Cluster-size axis at fixed beta and nb -- the roadmap's open question, does rho fall with Nc? Scouting confirms the geometry claim of TAKEAWAYS 6 directly: orbit sizes go {1:2, 2:1, 4:3} at 4x4 to {1:2, 2:1, 4:9, 8:3} at 8x8, i.e. three FREE m=8 orbits that a 4x4 mesh cannot have. n_seeds cut to 16: at 32 the ensemble is 6.2 h, over the 4 h budget rule."
+    }
+  ],
+  "reference_points": [
+    {
+      "label": "fe_as_b5_c4",
+      "model": "fe_as", "beta": 5, "nk": 16, "nb": 2, "n_ops": 8,
+      "source": "runs/beta_ladder_fe_as.json",
+      "role": "Already measured at 32 seeds as the beta=5 rung. Reused, NOT re-run -- re-running would spend 70 minutes reproducing a committed number."
+    }
+  ],
+  "blocked_points": [
+    {
+      "label": "kagome_b5_c4",
+      "model": "kagome", "beta": 5, "nb": 3, "n_ops": 12,
+      "status": "BLOCKED -- DCA-side segfault, out of scope",
+      "detail": [
+        "Kagome was the only model in the tree with THREE symmetry-equivalent orbitals and the only",
+        "route to a |G| = 12 point group, so it is worth recording precisely why it cannot run.",
+        "The target builds (KagomeHubbard<D6> passes orbit_table.hpp's CanDeriveSymmetry",
+        "static_assert) but every run segfaults inside DCA's own",
+        "SymmetrizeSingleParticleFunction::executeCluster, called from DcaData::initialize_G0() --",
+        "i.e. in production's symmetrization of G0, before any driver code runs. gdb backtrace",
+        "confirmed. Cause: Kagome's flavors() = {0,1,2} are all distinct, so set_symmetry_matrices'",
+        "position+flavor matching cannot place a rotated sublattice and records a band image of -1",
+        "(visible as '\"P\" : [ -1]' in the run log); those -1 images are then dereferenced.",
+        "Declaring D4 instead of D6 does NOT help -- also segfaults -- so it is the derive/record",
+        "path, not the declared group. DCA's own characterization test reaches 12 derived ops only",
+        "by calling verifiedSymmetryOps(H0) directly on a no_symmetry<2> instantiation, which never",
+        "exercises this path.",
+        "Fixing it means patching DCA's symmetrization, which ROADMAP task 4 scopes out. The .cpp and",
+        "template are kept so the attempt is not repeated from scratch."
+      ]
+    }
+  ]
+}

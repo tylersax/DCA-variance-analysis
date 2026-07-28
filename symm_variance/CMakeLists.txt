@@ -35,7 +35,8 @@ set(SYMM_VARIANCE_LIBS
 # *_symm_variance: the single-iteration bare-bath drivers (symm_variance_main.inc).
 # *_bath_drift:    the N-iteration bath-drift check, ROADMAP 3e (bath_drift_main.inc). Same model
 #                  setup and same output schema per iteration; only the driver body differs.
-foreach(_tgt square_symm_variance fe_as_symm_variance square_bath_drift fe_as_bath_drift)
+foreach(_tgt square_symm_variance fe_as_symm_variance threeband_symm_variance
+             kagome_symm_variance square_bath_drift fe_as_bath_drift)
   add_executable(${_tgt} ${CMAKE_CURRENT_SOURCE_DIR}/${_tgt}.cpp)
   target_include_directories(${_tgt} PRIVATE
     ${DCA_SOURCE_DIR}

@@ -154,6 +154,11 @@ int main(int argc, char** argv) {
     // remembered convention. Indexed [0]: these are per-DCA-iteration, and the driver runs one.
     writer.execute("sweeps_per_measurement", parameters.get_sweeps_per_measurement()[0]);
     writer.execute("warm_up_sweeps", parameters.get_warm_up_sweeps());
+    // mu is a per-model choice that this driver can never adjust -- it uses DcaLoopData but never
+    // DcaLoop, so the chemical-potential adjuster is never instantiated (Gotcha 11) and whatever the
+    // input says is what the run sampled. Recording it makes the filling of a new model checkable
+    // rather than remembered, and it is the second half of the analytic-G0 oracle below.
+    writer.execute("chemical_potential", parameters.get_chemical_potential());
     writer.execute("n_ops", n_ops);
     writer.execute("n_ranks", n_ranks);
     writer.execute("measurements_total", measurements_total);
@@ -174,6 +179,15 @@ int main(int argc, char** argv) {
     // Production symmetrized ensemble mean, for the mean-preservation validation rung.
     writer.open_group("functions");
     writer.execute(data.G_k_w);
+    // The non-interacting cluster Hamiltonian, which buys an oracle that depends on NOTHING
+    // production does. G0(k, iw) = [(iw + mu) I - H0(k)]^-1 is deterministic and exactly invariant
+    // under every symmetry of H0, so `P @ G0_analytic == G0_analytic` tests our derived operator on
+    // its own -- the same oracle DCA's symmetrization characterization test uses. That matters for
+    // any model where validation rung 2 (agreement with production's Symmetrize::execute) is
+    // expected to fail: rung 2 failing then localizes to production's imposition rather than to P.
+    // The STORED G0_k_w cannot serve this purpose -- dca_data.hpp:583 runs production Symmetrize
+    // over it during initialize(). H_DCA is written by initializeH0 and never symmetrized.
+    writer.execute(data.H_DCA);
     writer.close_group();
 
     // Authoritative point-group orbit operator P over the (b0,b1,k) index.

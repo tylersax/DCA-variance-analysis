@@ -1,0 +1,34 @@
+{
+  "__comment_operating_point__": [
+    "U_pp = 2 and mu = 3 are MEASURED choices, not defaults -- ROADMAP task 4, gate 1, 2026-07-28.",
+    "At the repo test's U_pp = 0 the |H_int| > 1e-3 filter in general_interaction.hpp leaves the p",
+    "orbitals with no CT-AUX vertices, and the consequence is far stronger than 'less noise on p':",
+    "the p-block G comes out DETERMINISTIC (across-rank sigma ~ 1e-17 against |G| ~ 1.6) and the d-p",
+    "block is identically zero in the measured G. Every class except d-d then carries a raw-variance",
+    "share of ~1e-30, so R collapses to the single-band answer (measured 1.03-1.12 against square's",
+    "1.04) and the equivalent-orbital block that is the entire point of this model has no signal.",
+    "U_pp > 0 is therefore REQUIRED, not a variant. Symmetry is untouched by the choice: the derive",
+    "path gates on H0 alone, so P, n_ops and the orbit table are bit-identical at any U_pp.",
+    "mu = 3 places the Fermi level at the p site energy (ep_p = 3), which is what populates the p",
+    "orbitals. Measured at (U_pp=2, mu=3): occupancy 2.88 of 6 (48% of a filled cell) and all four",
+    "entry classes carry real variance -- equivalent-orbital share 0.708 vs 0.000 at U_pp = 0.",
+    "U_pp = 8 diverges outright (band occupancy 28.7, R = nan) and must not be used.",
+    "DCA's JSON reader ignores unknown keys, so this block is inert."
+  ],
+  "physics": { "beta": 5, "chemical-potential": 3.0, "adjust-chemical-potential": false },
+  "threebands-Hubbard-model": { "t_pd": 1., "t_pp": 0.5, "ep_d": 0., "ep_p": 3., "U_dd": 8., "U_pp": 2. },
+  "domains": {
+    "real-space-grids": { "cluster": [[4, 0], [0, 4]] },
+    "imaginary-time":      { "sp-time-intervals":        64 },
+    "imaginary-frequency": { "sp-fermionic-frequencies": 64 }
+  },
+  "CT-AUX": { "expansion-parameter-K": 1., "initial-configuration-size": 10, "max-submatrix-size": 16 },
+  "DCA": { "iterations": 1, "self-energy-mixing-factor": 0., "interacting-orbitals": [0, 1, 2] },
+  "Monte-Carlo-integration": {
+    "warm-up-sweeps": 200, "sweeps-per-measurement": 2, "measurements": __MEASUREMENTS__,
+    "error-computation-type": "NONE",
+    "seed": __SEED__,
+    "threaded-solver": { "walkers": 2, "accumulators": 2,
+      "shared-walk-and-accumulation-thread": false, "fix-meas-per-walker": true }
+  }
+}
