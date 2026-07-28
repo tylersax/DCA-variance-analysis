@@ -578,6 +578,50 @@ always sitting inside a factor-1.6 interval. See §1a for the separate depth req
 The built-in null control is exact: singleton orbits (`m=1`, where `P` is the identity) return
 `r = 1` with deviation **0.000e+00** — not `1.0 +/- something`.
 
+## 7a. What a production DCA++ calculation costs: ~19,000-38,000 V100 GPU-hours
+
+This is the number that makes `R` worth caring about. It is **entirely from DCA++'s own published
+performance work** — no extrapolation from our runs, which are far too small to reach this regime.
+
+The Summit DCA++ paper specifies a configuration it calls "*a typical production level execution*":
+single-band square Hubbard, `U/t = 4`, `T/t = 0.02` (`beta = 50`), `Nc = 36`, average expansion order
+`<k> = 2600`, **80 million total measurements**. Its weak-scaling study fixes **50,000 measurements
+per node**, which it reports as "*a fixed runtime of about 12 minutes*".
+
+That last pair is the calibration. 12 min / 50,000 measurements = **0.0144 node-seconds per
+measurement**, so:
+
+| quantity | value |
+|---|---|
+| one DCA iteration (80M measurements) | **320 Summit node-hours** |
+| same, in GPU-hours (6x V100 per node) | **~1,900 V100 GPU-hours** |
+| full calculation, 10-20 self-consistency iterations | **3,200-6,400 node-hours** |
+| same, in GPU-hours | **~19,000-38,000 V100 GPU-hours**  <- headline |
+
+Only the last row is a judgement call: the iteration count is the conventional 10-20 rather than a
+figure quoted in the paper. Everything above it is arithmetic on published numbers.
+
+**Why this composes with `R` without any extrapolation.** CT-AUX cost is linear in the number of
+measurements at fixed model/`beta`/`Nc`, and `R` divides the measurements needed for a fixed error bar
+(sec. "Notation"). So the two numbers multiply directly: `R` from our runs, absolute scale from the
+literature. We never have to claim our `t_meas` reaches production.
+
+**And we must not make that claim.** Fitting our own run logs gives `t_meas ~ beta^1.94` (square,
+`beta = 1-8`) and `beta^2.14` (FeAs, `beta = 1-5`), both at `Nc = 16`. But the paper states cost scales
+as `O(k^3)` with `<k> ~ O(Nc*U/T)`. Our `<k>` is small enough that the cubic term has not taken over;
+production `<k>` is 2600. Extrapolating `beta^2` from `beta = 8` to `beta = 50` at `Nc = 16 -> 36`
+would be wrong by orders of magnitude, and we have **no `Nc`-scaling data at all** — every run in
+`scratch/` is `nk = 16`.
+
+**Caveat before this goes in an abstract.** Those are GPU node-hours for a run whose cost is dominated
+by two-particle measurements in single precision, while our `R` is measured on the single-particle `G`
+(see sec. 4d). The anchor and the multiplier are describing different channels; they compose cleanly
+only if `R` is comparable in both.
+
+Sources: [Accelerating DCA++ on Summit](https://www.osti.gov/servlets/purl/1607140) (config and
+timings); [DCA++ CPC paper](https://www.osti.gov/biblio/1606982).
+
+
 ## 8. DCA++ has no single-rank error bars
 
 Both error routes are across-rank: `JACK_KNIFE` returns an empty function at `n==1`
