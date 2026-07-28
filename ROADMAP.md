@@ -9,7 +9,8 @@ If you want to know *why* a number is what it is, go there, not here.
 single-particle Green's function, report it as `R = Var(G)/Var(Sym G)`, and eventually make it a
 standard solver output.
 
-**Current priority: task 3's remaining piece — the converged-bath control.** The FeAs β ladder is
+**Current priority: §3e — the one-off bath-drift check** (`R` across DCA iterations, square β=8,
+~70 min all-in). The FeAs β ladder is
 measured and the β trend reproduces on a second model *with a live sign problem* (TAKEAWAYS §3a);
 what is not yet tested is whether it survives at the bath a production run actually sees. After that,
 task 4 (broaden model coverage), which the ladder now points at directly: FeAs ends m-limited, so
@@ -97,8 +98,9 @@ in the HDF5 metadata, so any run's provenance is checkable rather than remembere
   deliberate choice, not because it was resolved.
 - ⚠️ An earlier 3-seed pass at `beta=4` showed `+0.34 +/- 0.13` (3/3 same sign) and `beta=5` showed
   `-0.25 +/- 0.23` with both large differences traceable to a single contaminated run (outlier index
-  3.66). At 8 seeds the `beta=4` signal vanished. **Three seeds cannot resolve a warm-up effect on a
-  sign-problem model** — do not re-run that comparison at n=3 and believe it.
+  3.66). At 8 seeds the `beta=4` signal vanished. **Three seeds cannot resolve a parameter effect on a
+  sign-problem model** — do not re-run that comparison at n=3 and believe it. The same trap produced a
+  false floor call at β=3 and a false "the committed headline is biased low" alarm in one session.
 
 **Every number here is measured at the BARE bath — iteration 1 of a cold-started DCA loop** (settled
 2026-07-28). The driver does not instantiate a `DcaLoop` at all: `symm_variance_main.inc` calls
@@ -112,7 +114,7 @@ Consequences, none of them accidents:
 
 - **`R` is a property of a single solver call at a given (β, bath).** A production run calls the
   solver ~10–20× per temperature; we characterize the first call only. Say so — do not imply the
-  measured `R` is what a converged run experiences on every iteration. The converged-bath control is
+  measured `R` is what a converged run experiences on every iteration. The bath-drift check (§3e) is
   task 3.
 - **The β ladder is a FIXED-BARE-BATH temperature axis, and that is a feature.** It varies β and
   nothing else. A self-consistent ladder varies β *and* `Σ(β)` together, so a monotone `R(β)` there
@@ -134,6 +136,15 @@ and both are overridable per run. Rules that follow:
 
 - **More ranks do not substitute for depth.** Precision on `R` comes from ranks; the sign floor does
   not care — more ranks at shallow depth is just more chances to draw a near-zero denominator.
+- **Measured floors, per rank** (`floor` mode, 3 seeds/rung): square 64 at β=1,2 and 256 at β=4,8;
+  **FeAs 1024 at β=1,2 (autocorrelation, ⟨s⟩≈1), rising to ≥4096 from β=3 (sign-set)**. The handover
+  from autocorrelation-set to sign-set happens between β=2 and β=3 as ⟨s⟩ falls 0.96 → 0.72.
+- **Chasing outlier index ≈ 1 is the wrong target and costs hours.** It would demand 16384/rank at
+  FeAs β=4 and more at β=5 (~14 h of ensembles). Milestone 6's paired depth check already settled the
+  question it purports to answer — same 32 seeds at 4× depth moved `R` by `+0.025 ± 0.100`, flat — so
+  depth clears *bias* at 2048/rank even where the estimator is heavy-tailed. `R` is a ratio of
+  across-rank variance sums, so one outlying rank inflates numerator and denominator together: heavy
+  tails cost **precision**, which seeds fix, not accuracy, which they would not.
 - **Quote `R` from across-seed scatter, not the rank bootstrap** — and now with the calibration
   measured rather than guessed. At 32 seeds the ratio (across-seed SD ÷ mean bootstrap SE) is
   **1.44 `[0.96, 1.79]` for FeAs** and **1.08 `[0.81, 1.27]` for square**. So the direction stands —
@@ -153,6 +164,14 @@ and both are overridable per run. Rules that follow:
   `seed_ensemble.check_seed_spacing` re-checks it.
 - **Check measured vs predicted per-orbit `r` on every new run.** They agree to 3 decimals at
   adequate depth; divergence flags a run contaminated by sign outliers. Free contamination detector.
+  ⚠️ **But it does NOT detect sign heavy-tails, and it is not a floor criterion.** `r_pred` is built
+  from `ρ` measured on the *same* sample, so the identity is near-algebraic and breaks only when mate
+  *variances* become unequal — not when one rank's near-zero denominator makes `G` heavy-tailed. At
+  FeAs β=5 it called 1024/rank clean and 16384 contaminated, which is backwards. Three instruments,
+  three different questions, do not substitute one for another:
+  **paired depth test → bias** (the floor criterion), **outlier index → conditioning** (largest
+  per-rank `max|G|` ÷ median; this is the sign diagnostic), **per-orbit law → orbit bookkeeping**
+  (membership and signs). Conflating the last two cost most of a session on 2026-07-28.
 
 ---
 
@@ -237,12 +256,12 @@ follow-on. **It is now task 3.**
   per-β seed ranges.
 - `analysis/beta_ladder.py` — per-rung aggregation, the trend test, and the two axis controls.
 
-### 3. FeAs β ladder — does the β trend reproduce on a second model?  ▸ MEASURED; converged-bath control outstanding
+### 3. FeAs β ladder — does the β trend reproduce on a second model?  ▸ MEASURED; §3e outstanding
 
 **Status (2026-07-28).** The ladder itself is **done and the answer is yes** — numbers in
 **TAKEAWAYS §3a**, chart in `05_beta_cross_model.ipynb`, data in `runs/beta_ladder_fe_as.json`.
 Depth floors were established per rung, the warm-up confound was tested and closed into a Convention,
-and all five rungs ran at 32 seeds. **What remains is the converged-bath control below** — everything
+and all five rungs ran at 32 seeds. **What remains is the bath-drift check in §3e** — everything
 measured so far is at the bare bath.
 
 | β | **`R`** | ρ (mates) | ⟨s⟩ | `w_null` |
@@ -303,7 +322,7 @@ What that already tells us, and what it does not:
 - `ρ_generic` falls 0.19 → 0.011 over β=1→5, i.e. the correlation-length effect appears to dominate
   the sign channel at least that far.
 
-**Design.**
+**Design as executed** (all of this is done — kept for the rationale).
 - Rungs β ∈ {1, 2, 3, 4, 5} to start; add 6 only if its floor turns out affordable. **β sets the
   ceiling here, not compute** — the sign floor rises steeply with β, and a rank whose accumulated
   sign hits zero yields `G = 0/0` and an unusable run.
@@ -317,22 +336,96 @@ What that already tells us, and what it does not:
   Interband has no local scalar channel, so it should carry lower `ρ_generic`; whether the *β trend*
   differs between blocks is new and is where TAKEAWAYS §4c would get its temperature axis.
 
-**Converged-bath control — two points, not a rework** (added 2026-07-28). The ladder measures at the
-bare bath by design (Conventions); this control answers the separate question **"does the β trend
-survive at the bath a production run actually sees?"** It matters more here than it did on square:
-`Σ` moves `⟨sign⟩` directly, and the crossover this task exists to locate is exactly where the sign
-channel wins. A bath that misrepresents `⟨sign⟩` is the one thing that could move the crossover point.
+**Cost, as estimated then and measured since.** The five-rung × 32-seed ladder took **2 h 13 m**
+(rung wall times 176 s, 458 s, 1033 s, 2179 s, 4207 s — a clean ~2× per unit β), against a ~1.5–2 h
+estimate. Floor ladders added ~1 h 50 m. Original note kept: roughly 8× the probe times for 8× depth, and 16→64 ranks is near-free in wall time on a
+128-core box. Estimate ~3 min/seed for all five rungs → **~1.5–2 h for the ensembles**, plus floor
+ladders. Comfortable overnight; no GPU (see task 2 — measure before assuming, and §3e for the one-off that
+remains).
 
-Run it at the endpoints only — β=1 and the top rung — on FeAs, and at β=1 and β=8 on square for a
-sign-free reference:
+**Gotchas specific to this run.**
+- The committed 32-seed FeAs ensemble at β=5 **cannot be reused as a rung**: those files predate the
+  `beta` metadata key, and `beta_ladder.build` refuses a run whose β it cannot verify. Re-run it.
+- `beta_ladder.sign_channel_check` will report `sign_free = False` here. That is the *point*, not a
+  failure — for FeAs, `⟨s⟩` is the second variable, tracked alongside `ρ`.
+- CT-AUX drops `J`/`Jp`, so this is an Ising-Hund density-density model regardless of the input —
+  describe it that way (Gotcha 2).
+
+**Done:** the cross-model chart is `05_beta_cross_model.ipynb` — `R(β)` and ρ(β) for both models on
+shared axes, two panels rather than a dual y-axis. The axes are not directly comparable (different
+band count, `U`, filling, `Nc` orbits); the claim is about **direction and mechanism**, not that the
+two curves coincide.
+
+### 3e. Bath drift — does `R` hold across the iterations a production run performs?  ▸ NEXT, one-off
+
+**Scoped 2026-07-28 with the advisor. This REPLACES the earlier "converged-bath control" spec**, which
+is kept below as the fallback because it answers a different (harder, and currently unnecessary)
+question. Read the distinction before running either — they are not the same experiment with
+different iteration counts.
+
+**The question that actually matters, and why.** Everything in this project is measured at the bare
+bath (Conventions), i.e. iteration 1 of a cold-started loop. That is not a false story for a
+compute-time claim: a production run does ~N iterations at *similar cost each*, and iteration 1 is one
+of them. What a total-compute statement depends on is the **cost-weighted average of `R` over the
+iterations actually run** — so the error in the claim is roughly `(N−1)/N × drift`. If `R` is flat
+across iterations, quoting the bare-bath number is honest and the caveat retires. If it drifts a lot,
+the headline understates or overstates what a user experiences. **That is one measurable number, and
+it is the whole point of this task.**
+
+**Run the loop and dump every iteration.** Instantiate the real `DcaLoop` with `iterations: N` and
+grab the raw per-rank `G` on *each* iteration, giving `R` at iteration 1, 2, … N.
+
+- **Hook point: between `integrate()` and `finalize()` inside `DcaLoop::solve_cluster_problem`**
+  (`dca_loop.hpp`, the two calls are ~10 lines apart). That is the *same gap*
+  `symm_variance_main.inc` already uses, and our patch already exposes
+  `local_G_k_w(/*symmetrize=*/false)` and `local_accumulated_sign()` on the solver. So it is a
+  ~12-line insertion — gather to rank 0, stash per iteration — reusing the existing writer.
+- **None of the three traps below apply.** No `Σ` file, no `initial-self-energy`, no
+  `do_not_update_sigma`, no `μ` overwrite: the loop constructs the bath itself. That is the entire
+  reason to prefer this route.
+- **Compare iteration 1 vs iteration N paired WITHIN seed.** The iterations are serially dependent
+  (iteration k's bath is built from k−1's noisy `Σ`), so they are not independent measurements of
+  anything — but pairing within seed is a strong design, the same trick `m_scaling`'s paired depth
+  test uses.
+
+**Do square β=8 first, once. ~50 min compute + ~20 min rebuild.** 8 seeds × 10 iterations at 64 ranks
+× 2048/rank. Square is chosen deliberately: it is sign-free, so any drift is *purely* the
+noise-structure change with the sign channel switched off — and TAKEAWAYS §3a already flags β=8 as
+where the bare-vs-converged gap should be widest, since the converged 4×4 square at β=8 has strong AF
+correlations feeding back into the bath. **Only escalate to FeAs β=5 (~3 h) if square shows drift.**
+
+**Decision rule, fixed in advance so this does not turn into a program.** Drift small (say ≲5% of
+`R`): write one sentence into TAKEAWAYS §3a and §4e, **delete the fallback below**, and never run it
+again for any model. Drift large enough to threaten the headline: *then* the frozen-bath version
+earns its complexity — and the expensive half of it is already paid for, because an N-iteration run
+produces the converged `Σ` as a byproduct.
+
+**Prior:** TAKEAWAYS §3a already hypothesizes that self-consistency pushes mate-`ρ` DOWN further at
+fixed β — the same direction as the measured β trend — which would make every bare-bath number a
+**conservative floor**. Likely outcome is that we are understating the benefit.
+
+<details><summary><b>Fallback: frozen converged-bath control</b> — different question, only if the drift check warrants it</summary>
+
+**How it differs, since both involve running N iterations.** This one converges `Σ` and then **freezes
+it**, so every seed sees an identical bath and `R` is measured as a property of one well-defined
+physical bath. The N-iteration route above leaves the bath **stochastic** — iteration k samples a bath
+carrying iteration k−1's Monte-Carlo error, which is what production actually experiences and which
+this version deliberately removes. *"Converged"* = at the fixed point **and held still**;
+*"iteration N"* = near the fixed point and still fluctuating. The difference between them is exactly
+the bath-noise contribution.
+
+⚠️ **In compute this version is CHEAPER, not more expensive** — one convergence run shared across all
+seeds (~22 min at FeAs β=5) plus one normal 32-seed ensemble (~71 min) ≈ 1.5 h, versus ~3 h for the
+N-iteration route, which pays N× per seed. Its cost is **code and traps**, not CPU. Do not reach for
+it on cost grounds.
+
+Endpoints only — β=1 and the top rung on FeAs, β=1 and β=8 on square for a sign-free reference:
 
 1. One stock `dca_main` run per control point to converge `Σ` — optionally chained from the rung
    below, exactly as the production Tc workflow chains temperatures. **Once per rung, not once per
-   seed**: all 32 seeds reuse the same `Σ` file, so the ensemble cost is unchanged and the added cost
-   is one moderate run per control point.
-2. Feed it back as `initial-self-energy` and measure at fixed bath. This is precisely
-   `do_not_update_sigma` semantics — a well-defined "measure at the self-consistent bath" experiment,
-   not a partially-converged one.
+   seed**: all 32 seeds reuse the same `Σ` file.
+2. Feed it back as `initial-self-energy` and measure at fixed bath — precisely `do_not_update_sigma`
+   semantics, a well-defined "measure at the self-consistent bath" experiment.
 3. Compare `R`, mate-`ρ`, `w_null` and `⟨sign⟩` against the bare-bath rung at the same β. Rungs 1 & 2
    must still pass on the new path — `P` is unchanged and `Σ` is symmetrized in the loop, so the mean
    stays symmetric; they are the sanity gate on the whole converged path.
@@ -343,38 +436,32 @@ Three traps, in the order they will bite:
   `initial-self-energy` to the template does nothing for our driver — it is read into the parameters
   and then ignored. Silent, and it looks like it worked.
 - **Loading `Σ` is not enough.** Without the cluster-mapping + cluster-exclusion steps the walker
-  still samples the bare `G0`. A run can look converged-seeded and be nothing of the kind. Whatever
-  the driver change ends up being, verify against a `dca_main` iteration-2 `G` before trusting it.
+  still samples the bare `G0`. A run can look converged-seeded and be nothing of the kind. Verify
+  against a `dca_main` iteration-2 `G` before trusting it.
 - **The `Σ` file overwrites the chemical potential** (`DcaData::initializeSigma` throws if the file
   has none, and takes `μ` from the completed iteration). FeAs's hand-set `μ = 1.45` will not survive,
   so the control point is not at identical filling to its bare-bath rung unless that is handled.
   Record `μ` alongside `β` in the run metadata.
 
-**Cost.** Roughly 8× the probe times for 8× depth, and 16→64 ranks is near-free in wall time on a
-128-core box. Estimate ~3 min/seed for all five rungs → **~1.5–2 h for the ensembles**, plus floor
-ladders. Comfortable overnight; no GPU (see task 2 — measure before assuming). The converged-bath
-control adds one `dca_main` convergence run per control point (4 points, ~10–20 iterations each) plus
-two extra 32-seed ensembles — it does **not** multiply the ladder by the iteration count, because `Σ`
-is computed once per rung and shared across seeds.
+</details>
 
-**Gotchas specific to this run.**
-- The committed 32-seed FeAs ensemble at β=5 **cannot be reused as a rung**: those files predate the
-  `beta` metadata key, and `beta_ladder.build` refuses a run whose β it cannot verify. Re-run it.
-- `beta_ladder.sign_channel_check` will report `sign_free = False` here. That is the *point*, not a
-  failure — for FeAs, `⟨s⟩` is the second variable, tracked alongside `ρ`.
-- CT-AUX drops `J`/`Jp`, so this is an Ising-Hund density-density model regardless of the input —
-  describe it that way (Gotcha 2).
-
-**Then:** the cross-model chart. Overlay/small-multiple `R(β)` and `ρ(β)` for square and FeAs on
-shared axes, as `05_beta_cross_model.ipynb`. Note the axes are not directly comparable (different
-band count, `U`, filling, `Nc` orbits) — the claim is about the *direction and mechanism*, not that
-the two curves should coincide.
 
 ### 4. Broaden model coverage — vary ONE axis at a time  ▸ carries the headline claim
 
 **The claim this task establishes:** symmetrization pays off most where the physics is most
 interesting — multi-orbital models, and *within* them the interband components that carry the
 distinctive physics. See TAKEAWAYS §4c.
+
+**The β ladders now point at this task with a measurement, not a hunch** (2026-07-28). Which ceiling
+binds *moves with the regime*: square stays ρ-limited at every β it was run (`1/ρ` only reaches 1.79
+at β=8, under its ~3.0 m-ceiling), while **FeAs crosses to m-limited between β=2 and β=3** and ends at
+`1/ρ = 13.2` against a ~3.7 m-ceiling. So FeAs at β≥3 has noise structure supporting a 13× reduction
+and a 4×4 geometry that can only cash 3.7× of it — **orbit size, not colder physics, is what buys more
+there.** Napkin ceiling for a realistic best case is `R` ≈ 5–10, not 20+, because `r → min(m, 1/ρ)`
+and the large orbits are variance-poor: FeAs's two m=8 orbits carry only **6%** of raw variance, and
+square 4×4 has no m=8 orbit at all (orbit size is `|G|/|stabilizer|`, and every k-point on a 4×4 mesh
+has a nontrivial stabilizer — the first free orbit-8 k-point needs 8×8). Reaching a higher ceiling
+means the variance has to *live* in large orbits, which is what this task should test first.
 
 **Four runs turn that framing into a defensible claim:**
 
@@ -412,6 +499,19 @@ Axes, and which knob in `r = m/[1+(m−1)ρ]` each moves:
 - ⚠️ **Check what CT-AUX actually simulates before adding a multi-orbital model.** It silently drops
   spin-flip (`J`) and pair-hopping (`Jp`) terms — see Gotchas — so `fe_as`, `hund_lattice`,
   `La3Ni2O7_bilayer` and `twoband_Cu` all run as density-density models regardless of input.
+
+**GPU: decide it here, by benchmark, not on the β axis** (assessed 2026-07-28). Not worth it at 4×4:
+matrices are small (expansion order ~ β·U·Nc), and the design — 64 MPI ranks = 64 independent samples
+— already maps perfectly onto 128 CPU cores at rank granularity, whereas 4 GPUs would serialize 16
+ranks each. The axis that could change this is **cluster size**: 4×4 → 8×8 quadruples the matrix
+dimension, ~64× the algebra. So if this task commits to 8×8, build once and benchmark a single 8×8
+FeAs run CPU vs GPU before committing the sweep; under ~3×, skip it. Two costs to budget beyond the
+build: re-validating rungs 1 & 2 on the GPU binary, and a **confounding risk** — if square runs on CPU
+and 8×8 on GPU, the code path is silently confounded with the axis, so keep one reference point run on
+both. Cheaper first move that nobody has measured: the thread config. Runs are currently 64 ranks × (2
+walkers + 2 accumulators) = 256 threads on 128 cores, 2× oversubscribed; 1+1 at 128 ranks may be
+faster for free. Hardware if needed: 4× RTX A5000 (24 GB, idle), CUDA 12.2, `-DDCA_WITH_CUDA=ON`,
+`CUDA_GPU_ARCH=sm_86`; `symm_variance_setup.hpp` already selects `linalg::GPU` under `DCA_HAVE_GPU`.
 
 ### 5. Migration scatter figure
 
@@ -476,8 +576,8 @@ the current project and the superseded prototype:
 | path | what |
 |---|---|
 | `symm_variance/` | **current work** — driver, orbit-table serializer, inputs, `run_symm_variance.sh`, `run_m_ladder.sh`, `run_seed_ensemble.sh`, `run_sign_sweep.sh`, `run_beta_ladder.sh` |
-| `symm_variance/analysis/` | numpy libs + notebooks (`01_validation_ladder`, `02_noise_mechanism`, `03_m_scaling`, `04_beta_ladder`) |
-| `symm_variance/runs/` | run data the notebooks read, plus `m_scaling_summary.json`, `seed_ensemble_{square,fe_as}.json` and `beta_ladder_square.json` |
+| `symm_variance/analysis/` | numpy libs + notebooks (`01_validation_ladder`, `02_noise_mechanism`, `03_m_scaling`, `04_beta_ladder`, `05_beta_cross_model`) |
+| `symm_variance/runs/` | run data the notebooks read, plus `m_scaling_summary.json`, `seed_ensemble_{square,fe_as}.json` and `beta_ladder_{square,fe_as}.json` |
 | `patches/symm-variance-dca.patch` | **our DCA source edits** — see warning below |
 | `ROADMAP.md`, `TAKEAWAYS.md`, `symm-variance-plan.md` | this file, headline claims, design doc |
 | `variance_demo/`, `notebooks/`, `SETUP.md`, `variance-demo-plan.md` | **superseded prototype** — reference only, be skeptical |
@@ -507,10 +607,14 @@ The 32-seed FeAs ensemble is ~70 min; the square one is under a minute.
 β ladder: `symm_variance/run_beta_ladder.sh <floor|ensemble> <model> <n_ranks> <outroot> <m|m,...>
 <seeds|n_seeds> <beta...>`, then `analysis/beta_ladder.py <root> --out runs/beta_ladder_<model>.json`.
 Run `floor` mode first — the depth floor moves with β — and only then `ensemble` above it. Square is
-cheap (~26 min for 4 rungs × 32 seeds at 2048/rank, β=8 dominating at 36 s/run); **no GPU needed**.
+cheap (~26 min for 4 rungs × 32 seeds at 2048/rank, β=8 dominating at 36 s/run); the FeAs 5-rung ×
+32-seed ladder is **2 h 13 m**, plus ~1 h 50 m of floor ladders. **No GPU needed** (§4 for when to
+revisit). `WARMUP`/`SWEEPS_PER_MEAS` are env overrides on `run_symm_variance.sh` and are inherited by
+every ladder script; Conventions fix them at 200 and 2.
 **Notebooks:** Jupyter kernel `symm-variance (py)`; regenerate via
-`symm_variance/analysis/build_notebooks.py`, which rewrites **all four** and clears outputs, so
-re-execute all four after any edit.
+`symm_variance/analysis/build_notebooks.py`, which rewrites **all five** and clears outputs, so
+re-execute all five after any edit — and check `execution_count` per cell afterwards, since nbconvert
+can exit 0 having executed nothing (Gotcha 12).
 
 ---
 
@@ -566,7 +670,15 @@ re-execute all four after any edit.
     `true`. Inert for our driver — it uses `DcaLoopData` but never `DcaLoop`, which is what calls the
     adjuster, so μ=1.45 stands (≈half filling, n≈2.02 of 4). But run that input through `main_dca`
     and the physics changes with no warning.
-12. **Consecutive base seeds are NOT independent runs.** Walker streams are
+12. **`build_notebooks.py` escapes backslashes TWICE, and the second stage is easy to miss.** Cell
+    source is written through a non-raw Python `"""` string, so LaTeX in a `CODE(...)` block needs
+    `\\rho`. But that yields `\rho` *in the generated cell*, which is eaten a second time unless the
+    literal there is also raw — so a bare `f'...$1/\\rho$...'` still breaks while `rf'...'` works.
+    Both forms produce `$1/ho$` and a matplotlib mathtext `ParseException` **at execute time, not
+    build time**, and nbconvert can report exit 0 while a notebook executed zero cells. Verify
+    execution by counting `execution_count` per cell, not by trusting the exit code. MD cells are
+    `MD(r"""...""")` and safe.
+13. **Consecutive base seeds are NOT independent runs.** Walker streams are
     `hash(global_id + base_seed)` with `global_id = local_id*n_ranks + proc_id`
     (`src/math/random/random_utils.cpp`), so base seeds `S` and `S+1` at 64 ranks share 63/64 of
     their walker streams. Nothing warns; the runs simply look like agreeing replicates and every

@@ -251,7 +251,8 @@ widest at the top rung — the converged 4x4 square at `beta=8` has strong AF co
 into the bath, where the bare problem does not. Direction is a hypothesis, not a measurement:
 self-consistency should push mate-`rho` DOWN further at fixed `beta`, the same direction as the
 measured trend, which would make this ladder a conservative floor at low T. **ROADMAP task 3 carries a
-two-point converged-bath control to settle it.**
+one-off **bath-drift check** to settle it — `R` measured at every DCA iteration of a real loop
+run, which is the compute-weighted quantity a total-cost claim actually rests on (ROADMAP §3e).**
 
 **Why this ladder is clean, and what it therefore cannot say.** Two effects compete in general:
 growing correlation length pushes `rho` DOWN, but `G = <sign*M>/<sign>` means a denominator
@@ -308,7 +309,7 @@ headline (`2.968 +/- 0.059` vs `3.042 +/- 0.049`) across disjoint seeds AND a di
   worth reporting as such.
 
 Evidence: `05_beta_cross_model.ipynb`, `runs/beta_ladder_fe_as.json`. **Still bare-bath on both
-models** — the converged-bath control is ROADMAP task 3's remaining piece.
+models** — the bath-drift check (ROADMAP §3e) is task 3's remaining piece.
 
 ## 4. The correlation that defeats symmetrization is already in the real-space noise
 
