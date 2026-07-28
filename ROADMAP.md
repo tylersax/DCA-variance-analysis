@@ -15,6 +15,11 @@ committed number reads as what a user experiences (TAKEAWAYS §4e). The β ladde
 models and the trend reproduces with a live sign problem (§3a). Task 4 is what the ladders point at
 directly: FeAs ends m-limited, so orbit size — not colder physics — is what buys more.
 
+> **Starting fresh on task 4?** Read *§4 → "Starting this task cold"* first — it has the model
+> candidates, the three files needed to add one, the environment paths, and the one fact that decides
+> the cost of this whole task (band-permuting symmetry is **derived from `H0`**, so a new
+> multi-orbital model needs no symmetry code). Then Conventions, then Gotchas.
+
 ---
 
 ## State
@@ -528,6 +533,81 @@ both. Cheaper first move that nobody has measured: the thread config. Runs are c
 walkers + 2 accumulators) = 256 threads on 128 cores, 2× oversubscribed; 1+1 at 128 ranks may be
 faster for free. Hardware if needed: 4× RTX A5000 (24 GB, idle), CUDA 12.2, `-DDCA_WITH_CUDA=ON`,
 `CUDA_GPU_ARCH=sm_86`; `symm_variance_setup.hpp` already selects `linalg::GPU` under `DCA_HAVE_GPU`.
+
+
+#### Starting this task cold — what a fresh session needs (written 2026-07-28, at the close of §3e)
+
+**You can measure at the bare bath and stop there.** §3e settled that `R` does not drift across the
+iterations a production run performs, so this task needs **no `DcaLoop` runs at all** — the ordinary
+`*_symm_variance` single-iteration driver is sufficient and its numbers transfer. Do not reach for
+`*_bath_drift` here.
+
+**Adding a model is three files and a rebuild** (verified this session by adding two targets):
+
+1. `symm_variance/<model>_symm_variance.cpp` — `#include <cmath>` **first** (Gotcha 8), then the
+   lattice header, then `#define SYMM_VARIANCE_LATTICE <type>`, `#define SYMM_VARIANCE_MODEL_LABEL
+   "<label>"`, then `#include "symm_variance_main.inc"`. Copy `fe_as_symm_variance.cpp`.
+2. `symm_variance/<model>_input.template.json` — `__SEED__` and `__MEASUREMENTS__` placeholders,
+   `interacting-orbitals` listing **every** band, `error-computation-type: NONE` (Gotcha 6), and
+   warm-up 200 / sweeps-per-measurement 2 per Conventions.
+3. Add the target name to the `foreach` list in `symm_variance/CMakeLists.txt`, then rebuild.
+
+**Band-permuting symmetry is DERIVED from `H0`, not declared — so a new multi-orbital model needs no
+symmetry code.** This is the single most useful fact for this task and it is easy to get wrong:
+`Lattice::orbitalPermutations()` returns an **empty** list on *every* stock lattice **including
+FeAs** (it inherits `bilayer_lattice`'s), so that is not where FeAs's 8 ops come from. The real
+mechanism is `deriveOrbitalOpForOp` (`solve_orbital_op_signs.hpp`), which *solves* for the orbital
+operator `U_S` from `H0` for each candidate spatial op; `verifiedSymmetryOps` keeps the ops that pass
+and silently drops the rest. FeAs declares {identity, C4} and derives 8 that way. Two preconditions
+before choosing a model:
+
+- **The derive candidate pool is `holohedry_pool_2D`** — 2D lattices only on this path.
+- **`U_S` must come out a SIGNED PERMUTATION (±1) or the op is silently dropped**, shrinking the
+  derived group with no error — `set_symmetry_matrices` rejects non-±1 fold phases, and
+  `orbit_table.hpp`'s `static_assert` separately pins the whole serializer to the derive-authoritative
+  path (`CanDeriveSymmetry`). So a 3-fold model (`Kagome_hubbard`, `triangular_lattice`) is a real
+  risk: a C3 that mixes
+  three orbitals with fractional coefficients fails the gate. **Check the derived op count (`n_ops`
+  in the HDF5 metadata) on the very first run of any new model** — if it collapses toward 1, this is
+  why, and the model is out of scope rather than broken.
+
+**Candidate models actually in the tree**, band counts verified from `BANDS`:
+
+| lattice | `nb` | note |
+|---|---|---|
+| `threeband_hubbard` | 3 | **the recommended 3-orbital run.** Emery d-p model (`ep_d`, `ep_p`, `t_pd`, `t_pp`, `U_dd`, `U_pp`) — the file's "two-orbital" header comment is stale, `BANDS = 3`. |
+| `Kagome_hubbard` | 3 | 3-fold — check the ±1 gate above before committing |
+| `fourband_lattice`, `La3Ni2O7_bilayer`, `square_plaquette_hubbard` | 4 | larger index space |
+| `twoband_lattice`, `twoband_Cu`, `twoband_chain`, `bilayer_lattice` | 2 | `bilayer_lattice` is FeAs's base class |
+
+**`threeband_hubbard` may collapse two of the four planned runs into one.** Its d orbital is
+inequivalent to its two p orbitals, while the two p orbitals are equivalent to each other — so a
+single run should show the band-permutation benefit *within* the p-p block and **none** in the d-p
+block. That is the "benefit should vanish for inequivalent orbitals" control and the `nb=3` trend
+point in one measurement, with the entry-class split (`reduction_map.py`) doing the separating.
+Verify the orbit table actually has that structure before relying on it.
+
+**Environment, so nothing is rediscovered:**
+- Build: `/home/tsax10/dca/build_symm` (`BIN_DIR` default in `run_symm_variance.sh`). ⚠️
+  `/home/tsax10/dca/build_bath_drift` is **orphaned** — it was configured against a §3e worktree that
+  no longer exists, so its compiled binaries still run but any rebuild fails until it is reconfigured
+  with `-S /home/tsax10/dca/analysis/symm_variance`. Use `build_symm` and ignore it, or delete it.
+- ⚠️ **The DCA source edits are uncommitted in `../source/DCA`'s working tree** and the build depends
+  on them. If that tree is ever reset, reapply `patches/symm-variance-dca.patch` (see the warning in
+  *Where things live*) — this now includes the `dca_loop.hpp` hooks as well as the `ctaux` changes.
+- Python: `/home/tsax10/dca/analysis/.venv/bin/python` (no scipy — `seed_ensemble` tabulates its own
+  t-quantiles). MPI: `/home/tsax10/conda/envs/qe/bin/mpirun`.
+- **Shared 128-core box — check load before launching** (`uptime`), and never time a run on a loaded
+  machine. Runs are 64 ranks × 4 threads = 2× oversubscribed by design; that is the established
+  config, not a mistake.
+- Point run output at `/home/tsax10/dca/scratch/` and commit only the summary JSON — a 64-rank run is
+  ~17-34 MB.
+
+**Order of operations for any new model**, each step gating the next: one run → check `n_ops` and the
+orbit table → validation rungs 1 & 2 (`analysis/validate.py`) → `floor` mode to establish the depth
+floor (it must be re-established per model, Conventions) → only then a 32-seed ensemble. Skipping the
+floor is what produced the false results catalogued in Conventions.
+
 
 ### 5. Migration scatter figure
 
