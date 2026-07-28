@@ -13,15 +13,15 @@ by their smallest terms, so a class that is both noisy and poorly-reduced pins t
 matter how well every other class does. That is a structural fact, not a reporting preference: a lone
 scalar `R` will always sit below a model's best-performing components and will always understate them.
 
-Measured on FeAs: interband entries reach `R_C = 4.56` while carrying only 2.1% of the variance, so
-they are invisible in the aggregate 2.48; intraband carries 84.8% at `R_C = 2.13` and sets the total.
+Measured on FeAs (32-seed ensemble, +/- sem over seeds): interband entries reach
+`R_C = 4.82 +/- 0.12` while carrying only 2.65% of the variance, so they are invisible in the
+aggregate 3.04; intraband carries 81.9% at `R_C = 2.53 +/- 0.04` and sets the total.
 
 HEADROOM. `R_ideal = sum(Var) / sum(Var/m)` is the `rho = 0` ceiling for a model's ACTUAL orbit
 structure, so `efficiency = R / R_ideal` separates "small because orbits are small" from "small
-because the noise is already symmetric". Measured on the 16-rank runs: square 1.035/3.053 = 33.9%;
-FeAs 2.156/2.894 = 74.5%. (Those two are single 16-rank draws. At 64 ranks x 3 seeds above each
-model's depth floor: square 34.1% +/- 0.1%, FeAs 87.5% +/- 3.1% -- see m_scaling.py and
-03_m_scaling.ipynb. The comparison below is unaffected, and if anything understated.)
+because the noise is already symmetric". From the 32-seed ensembles (seed_ensemble.py):
+**square 34.20% +/- 0.06%, FeAs 83.94% +/- 1.02%**. (Single 16-rank draws gave 33.9% and 74.5%, and
+3 seeds gave 34.1% and 87.5%; the comparison below holds under all three.)
 Note square's HEADROOM IS LARGER than FeAs's -- its orbit structure is fine, its noise is the
 problem. The models differ in the symmetry-structure of their noise, not in their symmetry structure.
 
