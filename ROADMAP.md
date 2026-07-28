@@ -102,13 +102,25 @@ in the HDF5 metadata, so any run's provenance is checkable rather than remembere
   sign-problem model** — do not re-run that comparison at n=3 and believe it. The same trap produced a
   false floor call at β=3 and a false "the committed headline is biased low" alarm in one session.
 
-**Every number here is measured at the BARE bath — iteration 1 of a cold-started DCA loop** (settled
-2026-07-28). The driver does not instantiate a `DcaLoop` at all: `symm_variance_main.inc` calls
-`data.initialize()` → `qmc_solver.integrate()` directly, and `DcaData::initialize()` builds only
-`H0`/`H_int` and the non-interacting `G0` (with `G0_cluster_excluded = G0`). The templates set
-`"iterations": 1` and no `initial-self-energy`. So we skip `perform_cluster_mapping`,
-`adjust_coarsegrained_self_energy` and `perform_cluster_exclusion_step` (`dca_loop.hpp` `execute()`)
-— the steps that turn a converged `Σ` into the bath the walker samples.
+**Every number here is measured at the BARE bath — `G0_cluster_excluded = G0`, the bare cluster
+non-interacting Green's function** (settled 2026-07-28). The driver does not instantiate a `DcaLoop`
+at all: `symm_variance_main.inc` calls `data.initialize()` → `qmc_solver.integrate()` directly, and
+`DcaData::initialize()` builds only `H0`/`H_int` and the non-interacting `G0` (with
+`G0_cluster_excluded = G0`). The templates set `"iterations": 1` and no `initial-self-energy`. So we
+skip `perform_cluster_mapping`, `adjust_coarsegrained_self_energy` and
+`perform_cluster_exclusion_step` (`dca_loop.hpp` `execute()`) — the steps that turn a converged `Σ`
+into the bath the walker samples.
+
+> ⚠️ **This is NOT "iteration 1 of a cold-started DCA loop", and that earlier wording was wrong**
+> (corrected 2026-07-28 by §3e, which measured it). A real loop runs cluster exclusion *before* its
+> first solve, and at `Σ_cluster = 0` that computes `G0_cluster_excluded = G_k_w`, the
+> **coarse-grained** cluster Green's function (`cluster_exclusion.hpp`: `one_plus_S_G` is the
+> identity, so `G0_excl = G`) — not the bare `G0(K)` that `DcaData::initialize()` assigns
+> (`dca_data.hpp:599`). The two differ by the dispersion's variation within each coarse-graining
+> patch, which on square β=8 is a **73%** relative difference in the bath at identical `Σ = 0`. So
+> there are two gaps between the committed numbers and a production run, not one: a fixed
+> coarse-graining offset **and** the self-consistency drift. §3e measures both; the bare bath is a
+> well-defined and reproducible reference point, it is just not the loop's first iteration.
 
 Consequences, none of them accidents:
 
@@ -575,7 +587,8 @@ the current project and the superseded prototype:
 
 | path | what |
 |---|---|
-| `symm_variance/` | **current work** — driver, orbit-table serializer, inputs, `run_symm_variance.sh`, `run_m_ladder.sh`, `run_seed_ensemble.sh`, `run_sign_sweep.sh`, `run_beta_ladder.sh` |
+| `symm_variance/` | **current work** — driver, orbit-table serializer, inputs, `run_symm_variance.sh`, `run_m_ladder.sh`, `run_seed_ensemble.sh`, `run_sign_sweep.sh`, `run_beta_ladder.sh`, `run_bath_drift.sh` |
+| `symm_variance/bath_drift_main.inc` | the §3e driver: runs the **real `DcaLoop`** and dumps raw per-rank `G` at every iteration, one HDF5 per iteration in the *same schema* as the single-iteration driver (so the whole analysis tier reads it unchanged) |
 | `symm_variance/analysis/` | numpy libs + notebooks (`01_validation_ladder`, `02_noise_mechanism`, `03_m_scaling`, `04_beta_ladder`, `05_beta_cross_model`) |
 | `symm_variance/runs/` | run data the notebooks read, plus `m_scaling_summary.json`, `seed_ensemble_{square,fe_as}.json` and `beta_ladder_{square,fe_as}.json` |
 | `patches/symm-variance-dca.patch` | **our DCA source edits** — see warning below |
@@ -588,7 +601,10 @@ tree; `../build` is the stale prototype build).
 
 > ⚠️ **The DCA source edits live in a different repo and are uncommitted there.**
 > `source/DCA` is its own git checkout; our changes to `ctaux_cluster_solver.hpp`
-> (`local_G_k_w(symmetrize)`, a latent-bug fix, `local_accumulated_sign()`) sit in its working tree.
+> (`local_G_k_w(symmetrize)`, a latent-bug fix, `local_accumulated_sign()`) and to `dca_loop.hpp`
+> (the two opt-in per-iteration hooks §3e needs — `pre_finalize_hook_` fires in the only gap where a
+> raw per-rank sample is legal, `post_finalize_hook_` where the finalized mean exists) sit in its
+> working tree.
 > `patches/symm-variance-dca.patch` is the authoritative copy — reapply with
 > `git -C ../source/DCA apply patches/symm-variance-dca.patch` if that tree is ever reset.
 
