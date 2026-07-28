@@ -63,6 +63,17 @@ def read_depth(h, n_ranks):
     return total // n_ranks, total
 
 
+def read_beta(h):
+    """Inverse temperature, from the file's own metadata.
+
+    The driver started recording `parameters.get_beta()` when beta became a swept axis (ROADMAP task
+    2). Runs written before that predate the sweep and are all at their template's beta, so there is
+    nothing to recover from them -- return None rather than guessing, and let the caller decide
+    whether a beta-less run belongs in a beta-indexed analysis.
+    """
+    return float(h["metadata/beta"][()][0]) if "metadata/beta" in h else None
+
+
 # ---- bootstrap over ranks -------------------------------------------------------------------------
 
 def _arms(run, subset=None):
@@ -224,6 +235,7 @@ def summarize(path, n_boot=400, blocks=None):
     with __import__("h5py").File(path, "r") as h:
         m_per_rank, m_total = read_depth(h, run.n_ranks)
         seed = int(h["metadata/seed"][()][0])
+        beta = read_beta(h)
     if meta:  # the filename is a convenience; the file's own metadata wins
         assert meta["m"] == m_per_rank and meta["seed"] == seed, f"name/metadata mismatch: {path}"
 
@@ -241,8 +253,8 @@ def summarize(path, n_boot=400, blocks=None):
     A, B = rm.entry_variance(run) if usable else (None, None)
     if not usable:
         return dict(path=os.path.basename(path), model=run.model, m=m_per_rank, m_total=m_total,
-                    seed=seed, n_ranks=run.n_ranks, n_ops=run.n_ops, nb=run.nb, nk=run.nk,
-                    nw=run.nw, usable=False, sign=sh, R_full=None, R_nonnull=None)
+                    seed=seed, beta=beta, n_ranks=run.n_ranks, n_ops=run.n_ops, nb=run.nb,
+                    nk=run.nk, nw=run.nw, usable=False, sign=sh, R_full=None, R_nonnull=None)
 
     if blocks is None:
         blocks = {"band-diagonal": (0, 0, 0)} if run.nb == 1 else \
@@ -257,7 +269,7 @@ def summarize(path, n_boot=400, blocks=None):
 
     return dict(
         path=os.path.basename(path), model=run.model, m=m_per_rank, m_total=m_total, seed=seed,
-        n_ranks=run.n_ranks, n_ops=run.n_ops, nb=run.nb, nk=run.nk, nw=run.nw,
+        beta=beta, n_ranks=run.n_ranks, n_ops=run.n_ops, nb=run.nb, nk=run.nk, nw=run.nw,
         usable=True, sign=sh,
         R_full=agg, R_full_ci=[boot_full["lo"], boot_full["hi"]], R_full_se=boot_full["se"],
         R_nonnull=rm.R_over(run, nn, A, B), R_nonnull_ci=[boot_nn["lo"], boot_nn["hi"]],

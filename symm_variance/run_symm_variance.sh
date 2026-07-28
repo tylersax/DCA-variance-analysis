@@ -12,6 +12,18 @@
 # Runs made before 2026-07-27 passed the total here and were therefore n_ranks times shallower than
 # their filenames suggest -- the committed 16-rank "4000" runs are 250 measurements per rank.
 #
+# BETA (env var, optional): overrides the template's "beta". This is the swept axis of the beta
+# ladder (ROADMAP task 2); putting it here rather than in a separate script means run_m_ladder.sh and
+# run_seed_ensemble.sh -- which both call this one -- become beta-aware for free. Unset means "use
+# the template's beta", so every existing call site is unaffected.
+#
+# SWEEPS_PER_MEAS / WARMUP (env vars, optional): same mechanism, for the two knobs that decide
+# whether a rank's measurements are actually independent draws. Both matter once beta is swept,
+# because autocorrelation AND thermalization times grow with beta while the template's values (2 and
+# 200) are fixed. A depth floor quoted in measurements is only meaningful at a stated
+# sweeps-per-measurement -- raising it decorrelates consecutive measurements, so it trades wall-clock
+# for effective sample size rather than just buying more of the same correlated samples.
+#
 # usage: run_symm_variance.sh <square|fe_as> <n_ranks> <measurements_per_rank> [seed] [outdir]
 set -euo pipefail
 
@@ -42,8 +54,28 @@ mkdir -p "$OUTDIR"
 INPUT="${OUTDIR}/${MODEL}_input.json"
 OUT="${OUTDIR}/${MODEL}.hdf5"
 sed -e "s/__SEED__/${SEED}/" -e "s/__MEASUREMENTS__/${MEAS_TOTAL}/" "$TEMPLATE" > "$INPUT"
+if [[ -n "${BETA:-}" ]]; then
+  # Rewrite the physics beta in place. The driver records parameters.get_beta() into the HDF5
+  # metadata, so the written file -- not this substitution -- is what the analysis trusts.
+  sed -i -E "s/(\"beta\"[[:space:]]*:[[:space:]]*)[0-9.]+/\1${BETA}/" "$INPUT"
+  grep -q "\"beta\"[[:space:]]*:[[:space:]]*${BETA}" "$INPUT" \
+    || { echo "[run] BETA=${BETA} substitution failed in ${INPUT}"; exit 1; }
+fi
+# Each substitution is verified rather than assumed: sed reports success even when it matched
+# nothing, so a renamed key would silently leave the template's value in place and the run would be
+# mislabeled in exactly the way that produces a wrong number with no error.
+if [[ -n "${SWEEPS_PER_MEAS:-}" ]]; then
+  sed -i -E "s/(\"sweeps-per-measurement\"[[:space:]]*:[[:space:]]*)[0-9.]+/\1${SWEEPS_PER_MEAS}/" "$INPUT"
+  grep -q "\"sweeps-per-measurement\"[[:space:]]*:[[:space:]]*${SWEEPS_PER_MEAS}" "$INPUT" \
+    || { echo "[run] SWEEPS_PER_MEAS=${SWEEPS_PER_MEAS} substitution failed in ${INPUT}"; exit 1; }
+fi
+if [[ -n "${WARMUP:-}" ]]; then
+  sed -i -E "s/(\"warm-up-sweeps\"[[:space:]]*:[[:space:]]*)[0-9.]+/\1${WARMUP}/" "$INPUT"
+  grep -q "\"warm-up-sweeps\"[[:space:]]*:[[:space:]]*${WARMUP}" "$INPUT" \
+    || { echo "[run] WARMUP=${WARMUP} substitution failed in ${INPUT}"; exit 1; }
+fi
 
-echo "[run] ${MODEL}: ${NRANKS} ranks x ${MEAS} meas/rank (total ${MEAS_TOTAL}), seed ${SEED} -> ${OUT}"
+echo "[run] ${MODEL}: ${NRANKS} ranks x ${MEAS} meas/rank (total ${MEAS_TOTAL}), seed ${SEED}${BETA:+, beta ${BETA}} -> ${OUT}"
 # --bind-to none: each rank is itself multi-threaded (walkers + accumulators), so do not pin a rank
 # to a single core.
 "$MPIRUN" -n "$NRANKS" --bind-to none "$BIN" "$INPUT" "$OUT"

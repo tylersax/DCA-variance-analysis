@@ -145,6 +145,15 @@ int main(int argc, char** argv) {
     writer.open_group("metadata");
     writer.execute("model", std::string(SYMM_VARIANCE_MODEL_LABEL));
     writer.execute("seed", parameters.get_seed());
+    // beta is a swept axis (ROADMAP task 2), and the analysis side takes the file's own metadata as
+    // authoritative over the filename -- so it has to be recorded here, not inferred from the name.
+    writer.execute("beta", parameters.get_beta());
+    // A depth in "measurements per rank" only means something at a stated sweeps-per-measurement,
+    // and both the autocorrelation and thermalization times grow with beta -- so the two knobs that
+    // decide whether those measurements are independent draws travel with the run, not with a
+    // remembered convention. Indexed [0]: these are per-DCA-iteration, and the driver runs one.
+    writer.execute("sweeps_per_measurement", parameters.get_sweeps_per_measurement()[0]);
+    writer.execute("warm_up_sweeps", parameters.get_warm_up_sweeps());
     writer.execute("n_ops", n_ops);
     writer.execute("n_ranks", n_ranks);
     writer.execute("measurements_total", measurements_total);
