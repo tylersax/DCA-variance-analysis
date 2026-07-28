@@ -5,6 +5,8 @@ Usage:  python build_notebooks.py          (then execute with nbconvert -- see R
 Produces:
   01_validation_ladder.ipynb  -- does the pipeline measure what it claims?
   02_noise_mechanism.ipynb    -- why is rho what it is? (the figures)
+  03_m_scaling.ipynb          -- is R independent of run depth? (the depth floor)
+  04_beta_ladder.ipynb        -- is square intrinsically rho-limited, or only at beta=1?
 """
 import nbformat as nbf
 
@@ -204,16 +206,18 @@ hidden."""),
 >
 > | | printed above | 95% CI from the same 16 ranks | **quote this instead** |
 > |---|---|---|---|
-> | square/D4 | 1.0345 | `[1.024, 1.058]` | **1.041 ± 0.003** |
-> | FeAs | 2.4821 | `[2.13, 3.51]` | **3.17 ± 0.14** |
+> | square/D4 | 1.0345 | `[1.024, 1.058]` | **1.0425 ± 0.0013** |
+> | FeAs | 2.4821 | `[2.13, 3.51]` | **3.042 ± 0.049** |
 >
 > The headline `R` is the **full-support** number — the left-hand column above, and the reduction a
 > user actually experiences. Non-null is an internal structural diagnostic, not a second headline.
 >
 > Square's is fine — ±1.6%. **FeAs's is not**: that interval spans a factor of 1.65, and 2.4821 is a
-> low draw from it. The revised values come from 64 ranks × 3 base seeds across the depth ladder;
-> the shift is *sampling noise*, not a correction of bias — FeAs's `R` is flat in depth. See
-> **`03_m_scaling.ipynb`**, which is the canonical source for the headline numbers.
+> low draw from it. The values to quote come from the **seed ensemble** — 32 independent base seeds
+> × 64 ranks × 2048 measurements/rank, each checked against a whole-run oracle and a paired depth
+> test (`analysis/seed_ensemble.py`, `runs/seed_ensemble_*.json`). The shift from 2.4821 is
+> *sampling noise*, not a correction of bias — FeAs's `R` is flat in depth, which is what
+> **`03_m_scaling.ipynb`** establishes.
 >
 > The rungs below are unaffected: they are identities and machine-precision checks, not estimates."""),
 
@@ -423,7 +427,8 @@ those are precisely the local-dominated, high-`ρ` ones, which is why `R` lands 
 > **Note on numbers.** Like notebook 01, this one reads the committed 16-rank runs, so every `ρ` and
 > `r` here is a single 16-rank draw. The mechanism they demonstrate is robust — the ordering,
 > the mate-vs-generic gap and the shell structure all reproduce at 64 ranks — but for quotable
-> values use `03_m_scaling.ipynb`: square `R = 1.041 ± 0.003`, FeAs `3.17 ± 0.14`."""),
+> values use the seed ensemble (`runs/seed_ensemble_*.json`): square `R = 1.0425 ± 0.0013`,
+> FeAs `3.042 ± 0.049`."""),
 ]
 write(nb, "02_noise_mechanism.ipynb")
 
@@ -648,3 +653,152 @@ independently of the autocorrelation time. The same measurement that certifies t
 the sign data that task 3 needs to separate the two competing effects on `ρ`."""),
 ]
 write(nb, "03_m_scaling.ipynb")
+
+
+# ======================================================================================
+# Notebook 4 -- beta ladder (ROADMAP task 2)
+# ======================================================================================
+nb = nbf.v4.new_notebook()
+nb.cells = [
+    MD(r"""# 4. β ladder — is square intrinsically ρ-limited, or only at β=1?
+
+Notebook 01 measured `R = 1.0425` for the square model and notebook 02 explained it: the mates'
+noise is almost perfectly correlated, `ρ ≈ 0.94`, and
+
+$$r \;=\; \frac{m}{1+(m-1)\rho}$$
+
+collapses to ~1 as `ρ → 1`. The natural reading was *"the single-band square model has symmetric
+noise"*. But β=1 is **also** the regime where noise is dominated by symmetric scalar channels — so
+that reading confounds **the model** with **the temperature**. This notebook separates them by
+sweeping β with everything else held fixed.
+
+**The prediction.** As β rises the correlation length grows, the noise acquires symmetry-*breaking*
+structure, `ρ` falls and `R` rises. If so, square is not intrinsically ρ-limited and the β=1 number
+is a property of the regime, not of the model.
+
+**The competing effect, and why this ladder does not suffer from it.** `G = ⟨sign·M⟩/⟨sign⟩`, and a
+fluctuation of that scalar denominator gives `δG(k) = −G(k)·δs/s` — a weight `−G(k)` that is itself
+symmetric. So **sign-problem noise is a fully symmetric channel with mate-correlation exactly 1**,
+pushing `ρ` *up* and `R` toward 1. Any model with a sign problem mixes the two effects and a bare
+`R(β)` curve cannot say which is acting.
+
+Square avoids this **by construction**: nearest-neighbour hopping on a bipartite lattice at half
+filling (μ=0) is provably sign-free in CT-AUX at *any* β. The runs confirm it — `⟨sign⟩` is exactly 1
+on every rank at every β — so this ladder isolates the correlation-length effect with the sign
+channel switched off. That is checked below, not assumed.
+
+**Design.** 4×4 cluster, D4, 64 ranks, **2048 measurements per rank**, **32 independent base seeds
+per β**, β ∈ {1, 2, 4, 8}. The depth clears every rung's floor by 8× (measured separately: the floor
+is 64 at β=1,2 and 256 at β=4,8 — it *rises* with β, so it was re-established at each rung rather
+than inherited). Each β gets a disjoint base-seed range, so no two rungs share walker streams."""),
+
+    CODE("""import sys, json
+sys.path.insert(0, '.')
+import numpy as np
+import matplotlib.pyplot as plt
+import beta_ladder as bl
+
+plt.rcParams['figure.dpi'] = 110
+S = json.load(open('../runs/beta_ladder_square.json'))
+rows = S['report']['rungs']
+print(f"{len(S['runs'])} runs | betas {[r['beta'] for r in rows]} | "
+      f"seeds/rung {[r['n_seeds'] for r in rows]} | depth {sorted({r['m'] for r in rows})} per rank")
+print('seed-spacing violations:', S['report']['seed_spacing_violations'] or 'none')"""),
+
+    MD(r"""## The result
+
+`R` on the full support, averaged over base seeds, with the standard error across seeds — the same
+estimator and the same conventions as the milestone-6 headline numbers."""),
+
+    CODE("""print(bl.rung_table(rows))"""),
+
+    MD(r"""## ρ falls, R rises
+
+Left: the mate-correlation `ρ` against β. Right: `R` against β. The band is the 95% t-interval on
+the mean across seeds."""),
+
+    CODE("""fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+b = np.array([r['beta'] for r in rows], float)
+for ax, key, lab in ((axes[0], 'rho', r'mate-correlation $\\rho$'),
+                     (axes[1], 'R_full', r'$R$ (full support)')):
+    m  = np.array([r[key]['mean'] for r in rows])
+    lo = np.array([r[key]['lo'] for r in rows])
+    hi = np.array([r[key]['hi'] for r in rows])
+    ax.fill_between(b, lo, hi, alpha=.25, color='#0072B2')
+    ax.plot(b, m, 'o-', color='#0072B2')
+    ax.set(xscale='log', xticks=b, xlabel=r'$\\beta$', ylabel=lab)
+    ax.set_xticklabels([f'{x:g}' for x in b])
+    ax.grid(alpha=.3)
+axes[1].axhline(1.0, ls=':', c='k', lw=1)
+fig.suptitle(r'Square 4$\\times$4, D4 — sign-free at every $\\beta$')
+plt.tight_layout()"""),
+
+    MD(r"""## Is the trend resolved?
+
+Four rungs is too few for a regression to carry weight, so two things four points *can* support are
+reported: the endpoint change with an interval built by resampling **seeds within each rung** (the
+level of independent replication the design actually has), and whether every rung-to-rung step shares
+one sign. Monotonicity alone is weak — three steps agreeing has probability 0.25 under an
+exchangeable null — so it is only meaningful beside an endpoint interval that excludes zero."""),
+
+    CODE("""print(bl.trend_table(S['report']['trends']))"""),
+
+    MD(r"""## The precondition: the sign channel must stay off
+
+The whole interpretation rests on this. If `⟨sign⟩` drifted below 1 anywhere on the ladder, a
+perfectly-symmetric noise channel would start feeding `ρ` and could be mistaken for the effect
+saturating."""),
+
+    CODE("""print(bl.sign_table(rows))"""),
+
+    MD(r"""## Control: `r` must stay flat in ω
+
+The input template fixes `sp-fermionic-frequencies` at 128 regardless of β, and Matsubara
+frequencies are spaced `π/β` — so the window in **absolute** energy units shrinks as β grows, and
+each rung sums `R` over a different slice of frequency space. That would confound the ladder *if* `r`
+depended on ω.
+
+It should not: the point group acts on band and momentum indices and does not touch Matsubara
+frequency. Measuring the slope at every β turns that from an assumption inherited from β=1 into a
+per-rung check."""),
+
+    CODE("""print(bl.omega_table(rows))"""),
+
+    MD(r"""## Mechanism: per-orbit ρ and the `m/[1+(m−1)ρ]` law
+
+The aggregate `R` is a variance-weighted mixture over orbits. Resolving it per orbit shows the law
+holding rung by rung — and measured-vs-predicted `r` doubles as the contamination detector, since a
+run whose variance is set by one outlying rank breaks the identity."""),
+
+    CODE("""print(bl.orbit_table(rows))"""),
+
+    CODE("""fig, ax = plt.subplots(figsize=(6.4, 4.4))
+for r in rows:
+    for o in r['orbits']:
+        ax.scatter(o['r_pred']['mean'], o['r']['mean'], s=38,
+                   label=f"beta={r['beta']:g}" if o is r['orbits'][0] else None,
+                   color=plt.cm.viridis(np.log2(r['beta'])/3))
+lim = ax.get_xlim()
+ax.plot(lim, lim, 'k:', lw=1)
+ax.set(xlabel=r'predicted  $m/[1+(m-1)\\rho]$', ylabel=r'measured  $r$',
+       title=r'Per-orbit law holds at every $\\beta$')
+ax.legend(); ax.grid(alpha=.3); plt.tight_layout()"""),
+
+    MD(r"""## What this establishes, and what it does not
+
+**Establishes.** `ρ` falls and `R` rises monotonically across β ∈ {1,2,4,8} on the square model, with
+the endpoint change resolved against across-seed scatter. **Square is not intrinsically ρ-limited** —
+its β=1 value of `R ≈ 1.04` is a property of that temperature regime, not of the single-band square
+model. The `m/[1+(m−1)ρ]` law holds rung by rung, so the gain is fully accounted for by the mechanism
+notebook 02 identified.
+
+**Does not establish.** This ladder says nothing about the *competing* sign channel, because square
+has no sign problem to exercise it — that is exactly why it is the clean instrument for the
+correlation-length axis, and exactly why it cannot settle where the two effects cross over. That
+needs a β ladder on a model that *has* a sign problem, where `⟨sign⟩` and `ρ` can be tracked
+together.
+
+**Scope, unchanged.** This is `Var(G)` for a single-iteration estimator on a 4×4 cluster in plain
+DCA under CT-AUX. Observable-level variance stays out of scope."""),
+]
+write(nb, "04_beta_ladder.ipynb")
