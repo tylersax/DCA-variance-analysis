@@ -191,9 +191,26 @@ by up to `sqrt(m)`. These are variance ratios, so `m` is the ceiling.
 
 This is the single most useful diagnostic for "should I bother symmetrizing this system?"
 
+**Which ceiling binds is not fixed per model — it MOVES with the regime, and the crossover is
+measured** (both beta ladders, 2026-07-28). The `m`-ceiling is ~3.0 for square and ~3.7 for FeAs:
+
+| model | `beta` | `1/rho` | binding |
+|---|---|---|---|
+| square | 1 -> 8 | 1.07 -> 1.79 | **`rho`, at every rung** |
+| FeAs | 1, 2 | 1.92, 2.28 | `rho` |
+| FeAs | 3, 4, 5 | 4.31, 8.70, **13.18** | **`m` (geometry)** |
+
+So square never escapes being rho-limited over the range it was run: colder physics keeps paying
+there, and more symmetry still would not. FeAs **crosses over between beta=2 and beta=3** and ends
+the ladder firmly m-limited — by beta=5 the noise structure would support a 13x reduction and the 4x4
+geometry can only cash 3.7x of it. The prescription flips with the crossover: below it, chase
+temperature; above it, chase orbit size (bigger cluster, larger point group, more equivalent bands).
+**Check which side you are on before spending anything** — this is a one-run diagnostic.
+
 ## 3a. `R` grows as you reach deeper into the interesting low-temperature physics
 
-*Measured on square; the FeAs rung is task 3 and NOT yet measured — see the caveat at the end.*
+*Measured on TWO models (2026-07-28). Square isolates the mechanism; FeAs tests it with a live sign
+problem. Both ladders are below, and the limit they expose is in 3b.*
 
 `rho` is a property of the REGIME, not of the model — square is not intrinsically rho-limited.
 
@@ -244,9 +261,8 @@ model with a sign problem mixes the two and a bare `R(beta)` curve cannot say wh
 
 Square is provably sign-free in CT-AUX at any `beta` (nearest-neighbour hopping, bipartite lattice,
 half filling), and the runs confirm it: `<sign>` is exactly 1 on every rank at every rung. So this
-ladder isolates the correlation-length effect **by construction** — and by the same token it says
-nothing about where the two effects cross over. That needs a `beta` ladder on a model that *has* a
-sign problem. **Not yet measured.**
+ladder isolates the correlation-length effect **by construction** — and by the same token it cannot
+say which effect wins when both are live. **That is what the FeAs ladder below settles.**
 
 Two controls, because the axis has two ways to lie:
 - **The depth floor rises with `beta`** and was re-established per rung, not inherited: 64 per rank at
@@ -260,13 +276,39 @@ Two controls, because the axis has two ways to lie:
 Evidence: `04_beta_ladder.ipynb`, `runs/beta_ladder_square.json`. The `beta=1` rung independently
 reproduces the milestone-6 headline (`1.0414 +/- 0.0015` here vs `1.0425 +/- 0.0013`, disjoint seeds).
 
-**How far this generalizes is ONE MODEL's worth — say so.** The mechanism argument (growing
-correlation length puts noise into symmetry-breaking channels) is not square-specific, and shallow
-below-floor scouting on FeAs is consistent with the same direction (`R` ~1.5 -> ~3.0 over beta=1->5).
-But that is scouting, not a measurement: it is below FeAs's sign floor and its apparent turnover at
-beta=6 sits at outlier index 2.5, which is contamination rather than a crossover. **Until the FeAs
-ladder is run at depth (ROADMAP task 3), state this as measured on square and expected to
-generalize — not as established across models.**
+### The second model, with the sign channel live
+
+**4x4 FeAs, 2-band, 64 ranks x 2048 measurements/rank, 32 independent base seeds per rung**
+(warm-up 200, per Conventions; disjoint seed range per rung):
+
+| `beta` | **`R`** | `rho` (mates) | `<s>` | `w_null` |
+|---|---|---|---|---|
+| 1 | 1.5259 +/- 0.0157 | 0.5221 +/- 0.0075 | 0.998 | 0.031 |
+| 2 | 1.8021 +/- 0.0186 | 0.4376 +/- 0.0065 | 0.961 | 0.065 |
+| 3 | 2.3427 +/- 0.0267 | 0.2320 +/- 0.0033 | 0.723 | 0.112 |
+| 4 | 2.7971 +/- 0.0188 | 0.1150 +/- 0.0028 | 0.378 | 0.152 |
+| 5 | **2.9679 +/- 0.0592** | 0.0759 +/- 0.0034 | 0.148 | 0.153 |
+
+`dR = +1.442 [+1.322, +1.561]`, `drho = -0.446 [-0.463, -0.430]`, both monotone and resolved.
+
+**The finding: `rho` falls monotonically even as `<s>` collapses to 0.148.** Sign noise is a
+*perfectly* mate-correlated channel and should drive `rho` UP; across the entire range where FeAs is
+simulable, it loses to the correlation-length effect. So the mechanism measured on square is not an
+artifact of a sign-free corner — **the trend is now established on two models, one of them with a
+live sign problem**, not extrapolated from one. The `beta=5` rung also reproduces the milestone-6
+headline (`2.968 +/- 0.059` vs `3.042 +/- 0.049`) across disjoint seeds AND a different warm-up.
+
+**Two honest qualifications.**
+- **Part of the `R_full` rise is `w_null`, not mechanism.** `R_full = R_non-null/(1 - w_null)`, and
+  `w_null` grows 0.031 -> 0.153. Over `beta=1->5` `R_full` rises x1.945 while `R_non-null` rises
+  x1.698, so roughly a quarter of the headline rise is the growing forced-null share. Both columns
+  belong in any cross-model plot, which is why Conventions require it here specifically.
+- **`beta=5` is at the edge of measurability**, not a comfortable interior point: outlier index 6.4
+  and the across-seed SEM triples (0.019 -> 0.059). That is the method's boundary showing, and it is
+  worth reporting as such.
+
+Evidence: `05_beta_cross_model.ipynb`, `runs/beta_ladder_fe_as.json`. **Still bare-bath on both
+models** — the converged-bath control is ROADMAP task 3's remaining piece.
 
 ## 4. The correlation that defeats symmetrization is already in the real-space noise
 

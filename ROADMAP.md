@@ -9,8 +9,11 @@ If you want to know *why* a number is what it is, go there, not here.
 single-particle Green's function, report it as `R = Var(G)/Var(Sym G)`, and eventually make it a
 standard solver output.
 
-**Current priority: task 3, the FeAs β ladder — does the β trend reproduce on a second model?** The
-estimator is exercised, its numbers are pinned, and the temperature axis is measured on square.
+**Current priority: task 3's remaining piece — the converged-bath control.** The FeAs β ladder is
+measured and the β trend reproduces on a second model *with a live sign problem* (TAKEAWAYS §3a);
+what is not yet tested is whether it survives at the bath a production run actually sees. After that,
+task 4 (broaden model coverage), which the ladder now points at directly: FeAs ends m-limited, so
+orbit size — not colder physics — is what buys more.
 
 ---
 
@@ -25,6 +28,7 @@ estimator is exercised, its numbers are pinned, and the temperature axis is meas
 | 5 | M-scaling control, bootstrap CIs, depth floors | `R` scale-free above a per-model depth floor |
 | 6 | Seed ensemble: 32 independent base seeds per model, whole-run oracle, paired depth check | `R` pinned to 1.6% (FeAs) and 0.13% (square) |
 | 7 | β ladder on square, β ∈ {1,2,4,8}, 32 seeds/rung, per-β depth floors | `ρ` falls, `R` rises, both resolved — square is **not** intrinsically ρ-limited |
+| 8 | β ladder on FeAs, β ∈ {1..5}, 32 seeds/rung, sign channel live | trend reproduces; `ρ` falls despite ⟨s⟩ → 0.148; `R` saturates against the **m**-ceiling |
 
 | model | **`R`** | orbits | ρ (mates) | depth floor, per rank |
 |---|---|---|---|---|
@@ -233,7 +237,36 @@ follow-on. **It is now task 3.**
   per-β seed ranges.
 - `analysis/beta_ladder.py` — per-rung aggregation, the trend test, and the two axis controls.
 
-### 3. FeAs β ladder — does the β trend reproduce on a second model?  ▸ NEXT
+### 3. FeAs β ladder — does the β trend reproduce on a second model?  ▸ MEASURED; converged-bath control outstanding
+
+**Status (2026-07-28).** The ladder itself is **done and the answer is yes** — numbers in
+**TAKEAWAYS §3a**, chart in `05_beta_cross_model.ipynb`, data in `runs/beta_ladder_fe_as.json`.
+Depth floors were established per rung, the warm-up confound was tested and closed into a Convention,
+and all five rungs ran at 32 seeds. **What remains is the converged-bath control below** — everything
+measured so far is at the bare bath.
+
+| β | **`R`** | ρ (mates) | ⟨s⟩ | `w_null` |
+|---|---|---|---|---|
+| 1 | 1.5259 ± 0.0157 | 0.5221 | 0.998 | 0.031 |
+| 2 | 1.8021 ± 0.0186 | 0.4376 | 0.961 | 0.065 |
+| 3 | 2.3427 ± 0.0267 | 0.2320 | 0.723 | 0.112 |
+| 4 | 2.7971 ± 0.0188 | 0.1150 | 0.378 | 0.152 |
+| 5 | **2.9679 ± 0.0592** | 0.0759 | 0.148 | 0.153 |
+
+`ΔR = +1.442 [+1.322, +1.561]`, `Δρ = −0.446 [−0.463, −0.430]`, both monotone and resolved.
+**ρ falls even as ⟨s⟩ collapses to 0.148** — the perfectly-mate-correlated sign channel loses to the
+correlation-length effect everywhere FeAs is simulable. Two results the ladder added beyond the
+trend: `R` is **saturating** against the orbit-size ceiling (steps +0.276, +0.541, +0.454, +0.171,
+with ρ still falling), and FeAs **crosses from ρ-limited to m-limited between β=2 and β=3**
+(TAKEAWAYS §3). Measured floors: 1024/rank at β=1,2 (autocorrelation, ⟨s⟩≈1) rising to ≥4096 from
+β=3 (sign-set). The β=5 rung reproduces the milestone-6 headline across disjoint seeds and a
+different warm-up (2.968 ± 0.059 vs 3.042 ± 0.049).
+
+⚠️ **β=5 is at the edge of measurability** — outlier index 6.4, across-seed SEM tripling
+(0.019 → 0.059). Report it as the method's boundary, not as a comfortable interior point. Nothing
+here locates where the sign channel finally wins; the β=6 scouting turnover was contamination.
+
+The original plan, kept for the design rationale:
 
 **The claim this establishes:** *`R` grows as you reach deeper into the more interesting
 low-temperature physics* — and it is a general statement about the method, not a quirk of one model.
