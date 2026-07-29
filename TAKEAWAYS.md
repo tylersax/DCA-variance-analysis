@@ -315,6 +315,54 @@ headline (`2.968 +/- 0.059` vs `3.042 +/- 0.049`) across disjoint seeds AND a di
 Evidence: `05_beta_cross_model.ipynb`, `runs/beta_ladder_fe_as.json`. **Still bare-bath on both
 models** — the bath-drift check (ROADMAP §3e) is task 3's remaining piece.
 
+## 3c. A bigger cluster buys a better `rho` -- and the orbits it unlocks sit idle
+
+*Measured 2026-07-29, ROADMAP task 4. Square/D4 at `beta = 5`, 64 ranks x 2048 measurements/rank,
+independent base seeds, both points floored at `<=512`/rank and provably sign-free
+(`<s>` = 1.0000 exactly).*
+
+The open question this settles: **does `rho` fall with cluster size?** It decides whether the
+`m`-ceiling is reachable in practice, because `r ~ min(m, 1/rho)` and a bigger cluster buys `m`.
+
+| | 4x4 (`nk` = 16), 32 seeds | 8x8 (`nk` = 64), 16 seeds |
+|---|---|---|
+| **`R`** | 1.2619 +/- 0.0072 | **1.5006 +/- 0.0130** |
+| **`rho` (mates)** | 0.6623 +/- 0.0049 | **0.5309 +/- 0.0056** |
+| `1/rho` | 1.51 | 1.88 |
+| `R_ideal` (m-ceiling) | 2.974 | 4.615 |
+| *efficiency (internal)* | *42.4%* | *32.5%* |
+| orbit sizes | `{1:2, 2:1, 4:3}` | `{1:2, 2:1, 4:9, 8:3}` |
+
+**Answer: yes.** `drho = -0.131` and `R` rises **19%** on a single axis -- only `Nc` changes, at fixed
+`beta`, band count, interaction and filling. This is the cleanest single-axis result in the project.
+
+**But the shape of it corrects the natural expectation, and that is the part worth saying.** The 8x8
+mesh delivers exactly what section 6 predicted it would: **three FREE `m=8` orbits**, which a 4x4 mesh
+cannot host at all (every k-point there lies on a mirror line). So the m-ceiling rises hard, 2.97 ->
+4.62. But `1/rho` only reaches 1.88, so **square stays `rho`-limited at BOTH sizes** (1.51 < 2.97 and
+1.88 < 4.62) -- and because the ceiling rose faster than the achieved reduction, **efficiency falls,
+42.4% -> 32.5%**.
+
+Put plainly, for anyone deciding what to spend on: *on square at `beta = 5`, a bigger cluster buys you
+a better `rho`, and the extra orbit structure you also paid for does nothing.* Both effects are real;
+only one of them is being cashed. This is the same lesson as section 4b -- a model's symmetry
+structure and the symmetry structure of its NOISE are different things, and it is the second that
+decides `R`.
+
+**What this does not establish.** Whether a model already **`m`-limited** converts 8x8 orbit structure
+into `R` is untested and is the obvious follow-on: FeAs at `beta >= 3` has `1/rho` up to 13.2 against a
+3.7 ceiling (section 3), i.e. it is starved of exactly what 8x8 supplies. On current evidence that is
+where a bigger cluster should pay, and square is precisely the model that cannot show it.
+
+> ⚠️ **Superseded values, kept because the mistake is instructive.** An earlier pass quoted this axis
+> as `R` = 1.2506 +/- 0.0013 / 1.4014 +/- 0.0026 with `drho = -0.100`, read off the **floor-ladder**
+> runs. Those intervals were void: `run_m_ladder.sh` does not enforce seed spacing -- deliberately,
+> since floor ladders nest at fixed seed -- so its seeds sat **1 apart where 4096 is required**, and at
+> 64 ranks consecutive base seeds share 63/64 of their walker streams (Gotcha 13). Three runs, one
+> effective sample, fake precision. The 8x8 point estimate then moved **1.4014 -> 1.5006** once
+> properly sampled, a 7% shift far outside the interval originally quoted. **Floor ladders answer
+> depth-flatness only; never read an interval or a headline off one.**
+
 ## 4. The correlation that defeats symmetrization is already in the real-space noise
 
 Symmetrization is an orthogonal projector: it deletes symmetry-**breaking** noise and leaves
