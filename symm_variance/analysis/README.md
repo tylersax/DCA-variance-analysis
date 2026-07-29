@@ -70,8 +70,11 @@ for nb in 01_validation_ladder 02_noise_mechanism 03_m_scaling 04_beta_ladder; d
 done
 ```
 
-Note `build_notebooks.py` rewrites **all four** notebooks, clearing outputs — re-execute all four
-after any edit.
+Note `build_notebooks.py` rewrites **every** notebook it emits, clearing outputs — so re-execute all
+of them after any edit, not just the one you changed. (Deliberately not a count: this said "all four"
+while five existed. `ls *.ipynb` is the authority; 06 and 07 are planned for the model sweep and the
+migration scatter.) Verify by counting `execution_count` per cell, not by trusting the exit code —
+nbconvert can exit 0 having executed nothing (Gotcha 12).
 
 ## Data contract
 

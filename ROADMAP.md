@@ -789,8 +789,37 @@ to their sign-aware orbit average. The cloud contracts toward its own centroid b
 at once. Singletons show no migration: the visual null control.
 
 Small-multiples grid, one panel per orbit. Ideal contrast: square (ρ≈0.94, barely moves) beside FeAs
-`m=8` (ρ≈0.08, collapses) — makes ρ-limited vs m-limited visual. Add as **`04_migration_scatter.ipynb`**
-(03 is taken by the M-scaling notebook) via `analysis/build_notebooks.py`.
+`m=8` (ρ≈0.08, collapses) — makes ρ-limited vs m-limited visual. Add as **`07_migration_scatter.ipynb`**
+via `analysis/build_notebooks.py`.
+
+**⚠️ The notebook number was stale.** Earlier text said `04_`, but 04 and 05 are taken
+(`04_beta_ladder`, `05_beta_cross_model`) and 06 is reserved for the task-4 model sweep. Use **07**.
+Remember `build_notebooks.py` rewrites **every** notebook and clears outputs, so adding this one means
+re-executing all seven and checking `execution_count` per cell (Gotcha 12 — nbconvert can exit 0
+having executed nothing).
+
+**Not blocked by task 4** (assessed 2026-07-29). Everything the figure needs — raw per-rank `G`
+(`Run.vec`), orbit membership *with signs* (`Run.orbits()`), and `P` — is in any run this project has
+ever written, including the two committed 16-rank files. But **do not build it from those**: three
+things are now known that make better input free.
+
+- **Use 64-rank runs, not the committed 16-rank ones.** Rank count *is* the number of points in the
+  cloud, and 16 makes a thin scatter for a figure whose whole subject is a cloud contracting. 64-rank
+  runs already exist in `scratch/` from tasks 2, 3 and 4 at no extra compute.
+- **The committed FeAs run is BELOW its depth floor** — 250 measurements/rank (Gotcha 1) against the
+  ≳1000/rank floor of §1a, with a live sign problem (measured `min|s|/max|s|` = 0.30). Below the floor
+  the per-rank `G` is heavy-tailed, so the cloud's spread is set by outliers and the contraction the
+  eye sees will *not* match the `r` quoted in the caption. Pick an at-or-above-floor run.
+- **⚠️ On a sign-problem model the invariant centroid is the PHASE-WEIGHTED one.** `G_i =
+  ⟨sign·M⟩_i/⟨sign⟩_i`, and production's mean is `Σ sign_i G_i / Σ sign_i`, not the plain average of
+  the per-rank points. Draw the plain centroid on FeAs and it will appear to move, contradicting the
+  figure's own "the centroid does not move" claim — and the contradiction would be an artifact of the
+  plot, not physics. Use `Run.phase_weighted_mean()`, which is what validation rung 2 uses.
+
+**Task 4 adds a panel rather than blocking one.** `threeband` carries both an equivalent-orbital block
+(p_x–p_y) and an inequivalent one (d–p) *inside a single model*, so a third column contrasting those
+two is a sharper statement of §4c's qualifier than square-vs-FeAs can make — the band-permutation
+machinery is live in one block and dormant in the other at identical β, cluster and filling.
 
 ### 6. Production reporting  ▸ deferred until the above is settled
 
@@ -889,9 +918,11 @@ that is what makes the coarse-graining gap a paired comparison. Needs its own bu
 targets); square β=8 at 10 iterations × 8 seeds is **41 min** plus 5 min for the reference arm, and
 each iteration file is ~17 MB, so point it at scratch and commit only the summary JSON.
 **Notebooks:** Jupyter kernel `symm-variance (py)`; regenerate via
-`symm_variance/analysis/build_notebooks.py`, which rewrites **all five** and clears outputs, so
-re-execute all five after any edit — and check `execution_count` per cell afterwards, since nbconvert
-can exit 0 having executed nothing (Gotcha 12).
+`symm_variance/analysis/build_notebooks.py`, which rewrites **every notebook it emits** and clears
+outputs, so re-execute all of them after any edit — not just the one you changed. Deliberately not a
+count here: the README carried "all four" while five existed. `ls symm_variance/analysis/*.ipynb` is
+the authority (01–05 today; **06** is the task-4 model sweep, **07** the migration scatter). Check
+`execution_count` per cell afterwards, since nbconvert can exit 0 having executed nothing (Gotcha 12).
 
 ---
 
