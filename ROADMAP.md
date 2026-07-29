@@ -625,22 +625,34 @@ the 4 h budget rule, so the manifest cuts it to **16 seeds (~3.1 h)**.
 |---|---|---|
 | `square_b5_c4` | **≤512/rank** | every step flat in all 3 seeds; ⟨s⟩ = 1.0000 exactly; `R` ≈ 1.25 |
 | `square_b5_c8` | **≤512/rank** | every step flat in all 3 seeds; ⟨s⟩ = 1.0000; outlier 1.02 |
+
+⚠️ Floor ladders answer DEPTH-flatness only. Their seeds are consecutive by design, so they are one
+effective sample: never read an interval, or a headline point estimate, off a floor ladder.
 | `threeband_b5_c4` | 2048/rank **at warm-up 8000** | see the thermalization finding below |
 
-**The cluster-size question is ANSWERED: `ρ` falls with `Nc`** (3 seeds at m=8192, ≫ the ≤512 floor,
-sign-free, so this is well controlled even before the ensembles pin it):
+**The cluster-size question is ANSWERED: `ρ` falls with `Nc`.** Seed ensembles, `check_seed_spacing`
+clean on both:
 
-| | 4×4 (nk=16) | 8×8 (nk=64) |
+| | 4×4 (nk=16), 32 seeds | 8×8 (nk=64), 16 seeds |
 |---|---|---|
-| **`R`** | 1.2506 ± 0.0013 | **1.4014 ± 0.0026** |
-| **`ρ` (mates)** | 0.6777 ± 0.0013 | **0.5777 ± 0.0012** |
-| `1/ρ` | 1.48 | 1.73 |
-| `R_ideal` (m-ceiling) | 3.015 | 4.611 |
-| efficiency | 41.5% | **30.4%** |
+| **`R`** | 1.2619 ± 0.0072 | **1.5006 ± 0.0130** |
+| **`ρ` (mates)** | 0.6623 ± 0.0049 | **0.5309 ± 0.0056** |
+| `1/ρ` | 1.51 | 1.88 |
+| `R_ideal` (m-ceiling) | 2.974 | 4.615 |
+| efficiency | 42.4% | **32.5%** |
 | orbit sizes | `{1:2, 2:1, 4:3}` | `{1:2, 2:1, 4:9, 8:3}` |
 
 So the roadmap's open question — *does `ρ` fall with cluster size?*, which decides whether the
-m-ceiling is reachable in practice — gets **yes**: `Δρ = −0.100`, and `R` rises 12%.
+m-ceiling is reachable in practice — gets **yes**: `Δρ = −0.131`, and `R` rises **19%**.
+
+> ⚠️ **Superseded, and the reason is worth keeping.** An earlier pass quoted this axis as
+> `R` = 1.2506 ± 0.0013 / 1.4014 ± 0.0026 and `Δρ = −0.100`, taken from the **floor-ladder** runs.
+> Those error bars were void: `run_m_ladder.sh` does not enforce seed spacing (deliberately — floor
+> ladders nest at fixed seed), so its seeds were `...001, ...002, ...003`, **1 apart where 4096 is
+> required**. At 64 ranks consecutive base seeds share 63/64 of their walker streams (Gotcha 13), so
+> those were effectively one sample and the ±0.001 was fake precision. `check_seed_spacing` reports 2
+> violations on each. The 8×8 point estimate moved 1.4014 → 1.5006 — a 7% shift, far outside the
+> interval originally quoted. **Never quote an interval from floor-ladder seeds; use the ensembles.**
 
 **But the shape of the answer matters more than the sign, and it cuts against the obvious reading.**
 Both ceilings rise, and the m-ceiling rises *faster*: 3.02 → 4.61 (the three **free** `m=8` orbits that
