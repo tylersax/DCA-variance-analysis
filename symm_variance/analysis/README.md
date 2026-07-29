@@ -53,8 +53,8 @@ one place is logic that can't drift between copies. The notebooks exercise and e
 
 ## Running
 
-A Jupyter kernel named **`symm-variance (py)`** is registered and already selected in all four
-notebooks. Its spec lives at `~/.local/share/jupyter/kernels/symm-variance/kernel.json` and holds an
+A Jupyter kernel named **`symm-variance (py)`** is registered and already selected in every notebook
+`build_notebooks.py` emits. Its spec lives at `~/.local/share/jupyter/kernels/symm-variance/kernel.json` and holds an
 **absolute** interpreter path, so it breaks whenever this repo moves (it pointed at
 `dca/analysis_deprecated/.venv` until 2026-07-27). If nbconvert dies with `FileNotFoundError` on a
 `.venv/bin/python`, that file is what to fix.
