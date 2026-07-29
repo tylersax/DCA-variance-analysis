@@ -8,6 +8,10 @@
     "1e6 and run_beta_ladder's 2e6 + beta*1e6. Walker streams are hash(global_id + base_seed), so",
     "overlapping ranges would silently make every interval too narrow (Gotcha 13);",
     "validate_manifest refuses to emit commands if any two points overlap.",
+    "`model` is the DRIVER name (what plan hands to run_*.sh); `model_label` is what the lattice",
+    "writes into the HDF5 as SYMM_VARIANCE_MODEL_LABEL. They differ (square -> square_D4), so the",
+    "provenance check is against `model_label` -- checking `model` flagged every square run as",
+    "mis-filed.",
     "Costs below are MEASURED, not guessed: the calibration constant t(64 ranks x 2048/rank) /",
     "t(16 ranks x 512/rank) = 13.9 was pinned on 2026-07-28 against fe_as's known 125 s at 64x2048",
     "(its scout took 9 s). A 32-seed ensemble is 32x that."
@@ -24,7 +28,7 @@
   "points": [
     {
       "label": "square_b5_c4",
-      "model": "square", "beta": 5, "L": 4, "nk": 16, "nb": 1, "n_ops": 8,
+      "model": "square", "model_label": "square_D4", "beta": 5, "L": 4, "nk": 16, "nb": 1, "n_ops": 8,
       "m": 2048, "seed0": 20000000, "mesh": "square",
       "blocks": {"band-diagonal": [0, 0, 0]},
       "scout_seconds": 2, "est_run_seconds": 28, "est_ensemble_hours": 0.25,
@@ -32,7 +36,7 @@
     },
     {
       "label": "threeband_b5_c4",
-      "model": "threeband", "beta": 5, "L": 4, "nk": 16, "nb": 3, "n_ops": 8,
+      "model": "threeband", "model_label": "threeband", "beta": 5, "L": 4, "nk": 16, "nb": 3, "n_ops": 8,
       "m": 2048, "seed0": 21000000, "mesh": "square", "chemical_potential": 3.0,
       "warm_up_sweeps": 8000,
       "__warmup_note__": [
@@ -66,7 +70,7 @@
     },
     {
       "label": "square_b5_c8",
-      "model": "square", "beta": 5, "L": 8, "nk": 64, "nb": 1, "n_ops": 8,
+      "model": "square", "model_label": "square_D4", "beta": 5, "L": 8, "nk": 64, "nb": 1, "n_ops": 8,
       "m": 2048, "seed0": 22000000, "mesh": "square", "n_seeds": 16,
       "blocks": {"band-diagonal": [0, 0, 0]},
       "scout_seconds": 50, "est_run_seconds": 695, "est_ensemble_hours": 3.1,

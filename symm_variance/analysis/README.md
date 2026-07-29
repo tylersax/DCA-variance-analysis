@@ -10,8 +10,10 @@ Plain numpy + h5py + matplotlib. No DCA imports, so this runs anywhere the drive
 | `02_noise_mechanism.ipynb` | *Why* is `ρ` what it is? Noise correlation matrices, real-space `σ²(r)` profiles, within- vs across-symmetry-shell correlation. |
 | `03_m_scaling.ipynb` | Is `R` actually independent of run depth? The depth floor, its two mechanisms (autocorrelation vs sign problem), and the bootstrap CIs. Reads `../runs/m_scaling_summary.json`, not the raw ladder. |
 | `04_beta_ladder.ipynb` | Is square intrinsically ρ-limited, or only at β=1? `ρ` and `R` across β ∈ {1,2,4,8} on a model that is sign-free at every β, so the correlation-length effect is isolated from the competing sign channel. Reads `../runs/beta_ladder_square.json`. |
+| `05_beta_cross_model.ipynb` | Does the β trend reproduce on a second model? The FeAs ladder beside square's, with the sign channel live. Reads `../runs/beta_ladder_{square,fe_as}.json`. |
+| `06_model_sweep.ipynb` | Does `R` grow with symmetry-**equivalent** orbitals? Four design points at fixed β=5, the within-model inequivalent-orbital control, and the cluster axis. Reads `../runs/model_sweep.json`. |
 
-All four are committed **with outputs and figures already executed**, so they can be read without
+They are committed **with outputs and figures already executed**, so they can be read without
 running anything. 01 and 02 read `../runs/*.hdf5`; 03 and 04 read the summary JSON beside them, since
 their raw ladders live in scratch and are not committed.
 
@@ -65,15 +67,15 @@ Regenerate and re-execute after changing `build_notebooks.py`:
 cd /home/tsax10/dca/analysis/symm_variance/analysis
 V=/home/tsax10/dca/analysis/.venv/bin/python
 $V build_notebooks.py
-for nb in 01_validation_ladder 02_noise_mechanism 03_m_scaling 04_beta_ladder; do
-  $V -m nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=1800 $nb.ipynb
+for nb in *.ipynb; do
+  $V -m nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=1800 "$nb"
 done
 ```
 
 Note `build_notebooks.py` rewrites **every** notebook it emits, clearing outputs — so re-execute all
-of them after any edit, not just the one you changed. (Deliberately not a count: this said "all four"
-while five existed. `ls *.ipynb` is the authority; 06 and 07 are planned for the model sweep and the
-migration scatter.) Verify by counting `execution_count` per cell, not by trusting the exit code —
+of them after any edit, not just the one you changed. The loop above globs rather than naming them,
+which is why it no longer goes stale. (This text said "all four" while five existed; `ls *.ipynb` is
+the authority. 07 is planned for the migration scatter.) Verify by counting `execution_count` per cell, not by trusting the exit code —
 nbconvert can exit 0 having executed nothing (Gotcha 12).
 
 ## Data contract

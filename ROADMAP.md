@@ -9,16 +9,21 @@ If you want to know *why* a number is what it is, go there, not here.
 single-particle Green's function, report it as `R = Var(G)/Var(Sym G)`, and eventually make it a
 standard solver output.
 
-**Current priority: task 4 — broaden model coverage.** §3e is **done** (2026-07-28): `R` does not
-drift across the iterations a production run performs, so the bare-bath caveat is closed and every
-committed number reads as what a user experiences (TAKEAWAYS §4e). The β ladders are measured on both
-models and the trend reproduces with a live sign problem (§3a). Task 4 is what the ladders point at
-directly: FeAs ends m-limited, so orbit size — not colder physics — is what buys more.
+**Task 4 is MEASURED (2026-07-29)** — all four ensembles run, aggregated, and written up in TAKEAWAYS
+§4c. Headlines: square at FeAs's own β=5 is `R` = 1.2619 ± 0.0072, so the **temperature confound is
+closed**; the nb trend is 1.26 → 2.97 → 3.24 and saturates; and the within-model entry-class control
+**corrected** §4c's inequivalent-orbital qualifier — a single equivalent pair lifts every block it
+touches, including blocks involving the inequivalent orbital. §3e closed the bare-bath caveat before
+it (TAKEAWAYS §4e), so these numbers read as what a user experiences.
 
-> **Starting fresh on task 4?** Read *§4 → "Starting this task cold"* first — it has the model
+**Current priority: task 5 — the migration scatter figure** (§5), which §4 does not block. Task 4b
+(push β higher on the model that maximizes `R`) is the natural follow-on to §4 and now has a measured
+target: threeband is m-limited at β=5.
+
+> **Starting fresh on a NEW model?** Read *§4 → "Starting this task cold"* — it has the model
 > candidates, the three files needed to add one, the environment paths, and the one fact that decides
-> the cost of this whole task (band-permuting symmetry is **derived from `H0`**, so a new
-> multi-orbital model needs no symmetry code). Then Conventions, then Gotchas.
+> the cost (band-permuting symmetry is **derived from `H0`**, so a new multi-orbital model needs no
+> symmetry code). Then Conventions, then Gotchas.
 
 ---
 
@@ -35,6 +40,7 @@ directly: FeAs ends m-limited, so orbit size — not colder physics — is what 
 | 7 | β ladder on square, β ∈ {1,2,4,8}, 32 seeds/rung, per-β depth floors | `ρ` falls, `R` rises, both resolved — square is **not** intrinsically ρ-limited |
 | 8 | β ladder on FeAs, β ∈ {1..5}, 32 seeds/rung, sign channel live | trend reproduces; `ρ` falls despite ⟨s⟩ → 0.148; `R` saturates against the **m**-ceiling |
 | 9 | Bath drift: real `DcaLoop`, 10 iterations × 8 seeds, square β=8 | `R` flat across iterations — **the bare-bath caveat is closed**; found a second gap (coarse-graining) the scope had missed |
+| 10 | Model sweep at fixed β=5: square 4×4, square 8×8, threeband; within-model entry-class control | **temperature confound closed** (square at β=5 = 1.26 vs FeAs 2.97); `R` = 1.26 → 2.97 → 3.24 over nb = 1 → 2 → 3, saturating; the inequivalent-orbital qualifier **corrected** — see TAKEAWAYS §4c |
 
 | model | **`R`** | orbits | ρ (mates) | depth floor, per rank |
 |---|---|---|---|---|
@@ -535,51 +541,56 @@ faster for free. Hardware if needed: 4× RTX A5000 (24 GB, idle), CUDA 12.2, `-D
 `CUDA_GPU_ARCH=sm_86`; `symm_variance_setup.hpp` already selects `linalg::GPU` under `DCA_HAVE_GPU`.
 
 
-#### ▶ RESUMING TASK 4 — read this first (handoff written 2026-07-29)
+#### ▶ TASK 4 RESULT — measured and written up (2026-07-29)
 
-**Where the work lives.** Not on `main`. Everything below is on branch
-**`worktree-task4-model-sweep`** (pushed), in worktree
-`/home/tsax10/dca/analysis/.claude/worktrees/task4-model-sweep`, built at
-**`/home/tsax10/dca/build_task4`**. ⚠️ `build_symm` is configured against the *main* checkout and does
-**not** have the `threeband`/`kagome` targets — using it will silently run the old binaries. There is
-**no PR**: `gh` is not installed on this box; open it at
-`https://github.com/tylersax/DCA-variance-analysis/pull/new/worktree-task4-model-sweep`.
+**Where the work lives.** Not on `main`. The ensembles and infrastructure are on branch
+**`worktree-task4-model-sweep`**; the aggregation, TAKEAWAYS §4c and notebook 06 are on
+**`worktree-task4-sweep-writeup`**, branched off it. Built at **`/home/tsax10/dca/build_task4`**.
+⚠️ `build_symm` is configured against the *main* checkout and does **not** have the
+`threeband`/`kagome` targets — using it will silently run the old binaries. `gh` is not installed on
+this box, so PRs are opened in the browser.
 
-**Run state.** `symm_variance/run_model_sweep_ensembles.sh` drives gate 4 sequentially and every step
-is skip-if-exists, so **just re-run it to resume** — it will no-op the finished points.
+**All four ensembles are complete**, 88 runs total, aggregated into `runs/model_sweep.json`:
 
-| ensemble | state | result |
+| ensemble | seeds | `R` (full support) |
 |---|---|---|
-| `square_b5_c4`, 32 seeds | ✅ done | `R` = 1.2619 ± 0.0072 |
-| `square_b5_c8`, 16 seeds | ✅ done | `R` = 1.5006 ± 0.0130 |
-| `threeband_b5_c4_w2000`, 8 seeds | ✅ done | the warm-up sensitivity arm, not a headline |
-| `threeband_b5_c4`, 32 seeds | ⏳ 23/32 at 12:30 | ~19 min/run; the long one |
+| `square_b5_c4` | 32 | **1.2619 ± 0.0072** |
+| `threeband_b5_c4` | 32 | **3.2380 ± 0.0359** (warm-up systematic −1.4%) |
+| `square_b5_c8` | 16 | **1.5006 ± 0.0130** |
+| `threeband_b5_c4_w2000` | 8 | the warm-up sensitivity arm, not a headline |
+| `fe_as_b5_c4` | 32 | **2.9679 ± 0.0592** — reused from the β ladder, not re-run |
 
-Raw HDF5s are in `/home/tsax10/dca/scratch/model_sweep/` (uncommitted, ~30 MB each). Floor ladders are
-in `/home/tsax10/dca/scratch/task4_floor/`, the warm-up study in `/home/tsax10/dca/scratch/task4_warmup/`.
+Raw HDF5s are in `/home/tsax10/dca/scratch/model_sweep/` (uncommitted, ~30–77 MB each). Floor ladders
+are in `scratch/task4_floor/`, the warm-up study in `scratch/task4_warmup/`.
 
-**What remains, in order:**
-1. Let the threeband ensemble finish (re-run the chain script if it was interrupted).
-2. `cd symm_variance/analysis && python model_sweep.py build ../runs/model_sweep_manifest.json --out ../runs/model_sweep.json --slim`
-   — **budget ~10–15 min**, measured; cost scales with `E = nb²·nk`, so threeband (E=144, ~8–14 s/run)
-   dominates. `--boot 100` only saves ~28% and is not worth degrading the diagnostic.
-3. **TAKEAWAYS §4c — the nb trend.** This is the task's headline claim and the *only* thing genuinely
-   gated on threeband's number. Replace the open prediction `nb=1 → 1.04, nb=2 → 3.04, nb=3 → ?` with
-   measured values at fixed β=5, and state which points share `|G|` and which do not.
-   **Quote the warm-up systematic beside `R`** (below) — it exceeds the statistical error.
-4. Notebook **`06_model_sweep.ipynb`** via `build_notebooks.py`, then re-execute *every* notebook and
-   check `execution_count` per cell (Gotcha 12).
-5. Commit, push, open the PR.
+**What was found** — full writeup in **TAKEAWAYS §4c**, figures in `06_model_sweep.ipynb`:
+- **The temperature confound is closed.** Square at FeAs's own β=5 is 1.26 against FeAs's 2.97, so
+  the gap between the project's two founding models is not a temperature artifact.
+- **The nb trend is 1.26 → 2.97 → 3.24 and saturates** (+1.71, then +0.27). Recorded as a *trend*,
+  not a controlled axis: `axis_pairs` emits no `nb` pair because band count cannot move without the
+  model moving too. The cluster axis is the sweep's only genuine single-axis pair, and it resolves.
+- **§4c's inequivalent-orbital qualifier was wrong and is corrected.** d–p entries are inequivalent
+  by band class yet reduce as well as p–p′ (`−0.045 [−0.163, +0.074]`, not resolved) — the p_x↔p_y
+  permutation reaches them, giving mean `m` = 5.00 above the k-symmetry maximum of 4. The genuinely
+  unreachable block is d–d, at 1.408 ± 0.010 beside square's 1.262 ± 0.007. A single equivalent pair
+  lifts every block it touches.
+- **threeband is m-limited at β=5** (`1/ρ` = 6.21 vs a 3.61 ceiling) where square is still ρ-limited:
+  band structure moves you across TAKEAWAYS §3's crossover, not only temperature.
+- **The warm-up systematic came in at −1.4%, unresolved at n=8** — smaller than the ~2.8% budgeted.
 
-**Three things a fresh session must not re-derive or get wrong:**
+**Three things not to re-derive:**
 - **threeband runs at warm-up 8000, not the Conventions' 200** (`MU=3.0`, `U_pp=2`). The manifest and
-  `model_sweep.plan` already emit this; `verify_point` will *raise* if a run's metadata disagrees.
-- **The warm-up systematic is disclosed, not resolved.** 2000 → 8000 moved `R` by −0.096 ± 0.021 at
-  n=3, which Conventions say not to believe on a sign-problem model. That is what the 8-seed
-  `threeband_b5_c4_w2000` arm is for — compute the difference at n=8 and quote it as a systematic
-  (~2.8%, larger than the across-seed error).
+  `model_sweep.plan` emit this; `verify_point` *raises* if a run's metadata disagrees.
+- **The manifest's `model` is the driver name, `model_label` is what the HDF5 records** — they differ
+  (`square` → `square_D4`). The provenance check is against `model_label`; checking `model` flags
+  every square run as mis-filed. This cost a debugging cycle on the first aggregation attempt.
 - **Kagome is out of scope** (DCA-side segfault, diagnosed in the manifest's `blocked_points`). Do not
-  retry it; the `.cpp` and template are kept only so the attempt is not repeated from scratch.
+  retry it; the `.cpp` and template are kept only so the attempt is not repeated from scratch. It was
+  also the only route to three *mutually* equivalent orbitals and to `|G|`=12, so that remains untested.
+
+**Follow-ons this opened:** task 4b (push β higher — threeband is now the measured m-limited target),
+and the untested question of whether an 8×8 cluster pays on a model that is *already* m-limited, which
+square structurally cannot show (§3c).
 
 **Task 5 is independent of all of this** — see its section for the corrected notebook number (**07**)
 and the three input caveats. If working it in parallel, branch a *separate* worktree off

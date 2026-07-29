@@ -30,6 +30,13 @@ are model-agnostic; this module adds only what they cannot do:
                                            and silently returns nonsense on a hexagonal one
               manifest verification        every design point's metadata checked against a declared
                                            manifest, raising on mismatch
+              class_across_seed            the class decomposition as an across-seed statistic --
+                                           the contrast between two classes IS the causal claim, and
+                                           one run cannot say whether a gap beats the seed scatter
+              class_contrasts              those differences with 95% intervals, so a prediction can
+                                           come back NOT FOUND rather than merely un-quantified
+              arms / systematics           sensitivity arms (same point, one nuisance knob moved)
+                                           reported as a disclosed systematic, never as a correction
 
 WHY NOT beta_ladder.trend. Its shape is monotonicity plus an endpoint delta over an ORDERED axis.
 `model` and `point group` are CATEGORICAL -- a monotone verdict on them is meaningless. Ordered axes
@@ -59,7 +66,14 @@ TOL = 1e-9
 # Fields verified against the manifest on every single run. The directory name and the filename are
 # conveniences; the file's own metadata is the authority. Same policy as beta_ladder.build, which
 # raises rather than grouping when a file's beta disagrees with the directory it sits in.
-_CHECKED = ("model", "beta", "nb", "nk", "n_ops", "n_ranks", "m")
+_CHECKED = ("beta", "nb", "nk", "n_ops", "n_ranks", "m")
+# `model` is NOT in _CHECKED: the manifest's `model` is the DRIVER name that `plan` hands to
+# run_*.sh, while the HDF5 records the lattice's SYMM_VARIANCE_MODEL_LABEL, and the two vocabularies
+# do not coincide -- the square point is driven as `square` but labels itself `square_D4`. Comparing
+# them directly makes every square run look mis-filed. The manifest therefore declares `model_label`
+# separately and that is what the file is held to, so the provenance check stays strict on the one
+# string the file can actually vouch for.
+_MODEL_LABEL_KEY = "model_label"
 # Checked only when the run records them (the driver gained these keys after runs already existed).
 _CHECKED_OPTIONAL = ("sweeps_per_measurement", "warm_up_sweeps", "chemical_potential")
 
@@ -74,6 +88,33 @@ def load_manifest(path):
         for k, v in defaults.items():
             p.setdefault(k, v)
     return man
+
+
+def arms(man):
+    """Sensitivity arms as fully-formed design points: the parent point with ONE knob moved.
+
+    An arm is not a headline point -- it exists to measure a systematic that the headline must be
+    quoted with. It inherits everything from its parent (so the comparison really is one-knob) and
+    overrides only what it declares. Arms are returned flattened because every check that protects a
+    point protects an arm equally: an arm whose seed range collided with its parent's would make the
+    systematic look smaller than it is, which is the one direction that matters.
+    """
+    out = []
+    for p in man["points"]:
+        arm = p.get("sensitivity_arm")
+        if not arm:
+            continue
+        merged = {k: v for k, v in p.items() if k != "sensitivity_arm"}
+        merged.update(arm)
+        # The knobs are whatever the arm overrides that is not bookkeeping. Derived, not declared:
+        # an arm that quietly moved a second parameter would otherwise be reported as if it moved one.
+        knobs = sorted(k for k in arm if k not in ("label", "n_seeds", "seed0", "role"))
+        merged["parent"] = p["label"]
+        merged["knobs"] = knobs
+        merged["arm_knobs"] = {k: arm[k] for k in knobs}
+        merged["parent_knobs"] = {k: p.get(k) for k in knobs}
+        out.append(merged)
+    return out
 
 
 def validate_manifest(man):
@@ -91,7 +132,7 @@ def validate_manifest(man):
         problems.append(f"duplicate point labels: {sorted(dupes)}")
 
     spans = []
-    for p in man["points"]:
+    for p in man["points"] + arms(man):
         need = ("label", "model", "beta", "nk", "nb", "n_ops", "m", "n_seeds", "seed0", "n_ranks")
         missing = [k for k in need if k not in p]
         if missing:
@@ -147,6 +188,9 @@ def verify_point(point, summary, extra):
             ok = abs(float(want) - float(got)) < 1e-9
         if not ok:
             bad.append(f"{key}: manifest={want} file={got}")
+    want_label, got_label = point.get(_MODEL_LABEL_KEY), summary.get("model")
+    if want_label is not None and got_label is not None and want_label != got_label:
+        bad.append(f"{_MODEL_LABEL_KEY}: manifest={want_label} file={got_label}")
     for key in _CHECKED_OPTIONAL:
         if key in extra and key in point:
             if abs(float(point[key]) - extra[key]) > 1e-9:
@@ -433,7 +477,7 @@ def summarize_point(man, point, n_boot=400, verbose=True):
             print(f"[model_sweep] {point['label']}: no runs in {d}")
         return dict(point=point, dirpath=d, runs=[], structure=None, by_class=None, paths=[])
 
-    runs, fingerprints = [], []
+    runs, fingerprints, by_class_runs = [], [], []
     structure, by_class, mesh_note = None, None, None
     for i, p in enumerate(paths):
         run = Run(p)
@@ -451,6 +495,18 @@ def summarize_point(man, point, n_boot=400, verbose=True):
         verify_point(point, s, _extra_metadata(p))
         runs.append(s)
         fingerprints.append(p_fingerprint(run))
+        # The class decomposition is computed for EVERY run, not just the first: task 4's causal
+        # claim is a contrast BETWEEN classes, and a difference that is not resolved against the
+        # scatter between seeds is not a finding. Costs ~1.5 s/run against ~35 s to summarize one.
+        this_class = {}
+        for mode in ("binary", "pair", "equivalence"):
+            rows_c, recon, agg = rm.reduction_table(run, band_pair_classes(run, mode))
+            this_class[mode] = dict(
+                rows=[dict(cls=r["cls"], n=r["n"], w=r["w"], R_C=r["R_C"],
+                           mean_m=r["mean_m"]) for r in rows_c],
+                harmonic_reconstruction=recon, aggregate_R=agg,
+                reconstruction_gap=abs(recon - agg) if np.isfinite(recon) else None)
+        by_class_runs.append(this_class)
         if i == 0:
             structure = dict(
                 band_equivalence=band_equivalence(run),
@@ -459,14 +515,7 @@ def summarize_point(man, point, n_boot=400, verbose=True):
                 mesh=dict(square=ok, note=why),
                 occupancy=band_occupancy(run),
             )
-            by_class = {}
-            for mode in ("binary", "pair", "equivalence"):
-                rows_c, recon, agg = rm.reduction_table(run, band_pair_classes(run, mode))
-                by_class[mode] = dict(
-                    rows=[dict(cls=r["cls"], n=r["n"], w=r["w"], R_C=r["R_C"],
-                               mean_m=r["mean_m"]) for r in rows_c],
-                    harmonic_reconstruction=recon, aggregate_R=agg,
-                    reconstruction_gap=abs(recon - agg) if np.isfinite(recon) else None)
+            by_class = this_class
         if verbose:
             print(f"[model_sweep] {point['label']}: {os.path.basename(p)}  "
                   f"R={s.get('R_full')}")
@@ -479,19 +528,90 @@ def summarize_point(man, point, n_boot=400, verbose=True):
                              f"'{point['label']}'\n  first={base}\n  this ={fp}")
 
     return dict(point=point, dirpath=d, runs=runs, structure=structure, by_class=by_class,
-                paths=paths, mesh_note=mesh_note)
+                by_class_runs=by_class_runs, paths=paths, mesh_note=mesh_note)
 
 
 def build(manifest_path, n_boot=400, verbose=True):
     man = load_manifest(manifest_path)
     validate_manifest(man)
     points = [summarize_point(man, p, n_boot, verbose) for p in man["points"]]
-    return dict(manifest=man, root=man["root"], points=points)
+    arm_points = [summarize_point(man, a, n_boot, verbose) for a in arms(man)]
+    for pt in points + arm_points:
+        pt["class_stats"] = class_across_seed(pt)
+    return dict(manifest=man, root=man["root"], points=points, arms=arm_points)
 
 
 def _stat(values):
     vals = [v for v in values if v is not None and np.isfinite(v)]
     return se.across_seed(vals) if vals else None
+
+
+def class_across_seed(pt):
+    """Per-class `R_C` as an across-seed statistic rather than a one-run anecdote.
+
+    Class names are required to be identical across runs of a point -- a partition that changed
+    shape between seeds would otherwise be averaged position-wise into nonsense, which is precisely
+    the kind of error that looks like a plausible table.
+    """
+    # Reduced form wins when present: `build` stores it so that `--slim` can drop the 88 per-run
+    # tables it was reduced from without costing `report` the ability to rebuild from the JSON alone.
+    if pt.get("class_stats"):
+        return pt["class_stats"]
+    per_run = pt.get("by_class_runs") or []
+    if not per_run:
+        return None
+    out = {}
+    for mode in per_run[0]:
+        names = [r["cls"] for r in per_run[0][mode]["rows"]]
+        for rr in per_run[1:]:
+            if [r["cls"] for r in rr[mode]["rows"]] != names:
+                raise ValueError(f"class partition '{mode}' is not stable across runs of "
+                                 f"{pt['point']['label']}")
+        out[mode] = {
+            name: dict(n=per_run[0][mode]["rows"][j]["n"],
+                       mean_m=per_run[0][mode]["rows"][j]["mean_m"],
+                       R_C=_stat([rr[mode]["rows"][j]["R_C"] for rr in per_run]),
+                       w=_stat([rr[mode]["rows"][j]["w"] for rr in per_run]))
+            for j, name in enumerate(names)}
+    return out
+
+
+# The contrasts that decide task 4's qualifier, named as (label, class A, class B). Each is a pair of
+# classes inside ONE model, so beta, U, filling and geometry are held exactly fixed by construction.
+_CONTRASTS = (
+    ("off-diagonal: inequiv - equiv", "off-diagonal, inequivalent", "off-diagonal, equivalent"),
+    ("diagonal: band-orbit >1 - 1", "diagonal, band-orbit >1", "diagonal, band-orbit 1"),
+    ("off-diag equiv - diag orbit 1", "off-diagonal, equivalent", "diagonal, band-orbit 1"),
+)
+
+
+def class_contrasts(rows_):
+    """Within-model differences between entry classes, with intervals.
+
+    TAKEAWAYS 4c makes two separable claims: that the benefit concentrates on off-diagonal entries,
+    and that it comes from symmetry-EQUIVALENT orbitals rather than from orbital count. Inside a
+    single model those are different contrasts between different pairs of classes, and only one of
+    them can be tested by comparing whole models. Reporting them as differences with intervals is
+    what keeps a prediction falsifiable: a contrast whose interval spans zero has FAILED to find the
+    effect it predicted, and must be written up that way rather than as agreement.
+    """
+    out = []
+    for r in rows_:
+        cs = (r.get("class_stats") or {}).get("equivalence")
+        if not cs:
+            continue
+        for name, a, b in _CONTRASTS:
+            sa, sb = cs.get(a, {}).get("R_C"), cs.get(b, {}).get("R_C")
+            if not sa or not sb:
+                continue
+            d = sa["mean"] - sb["mean"]
+            sem = float(np.hypot(sa["sem"], sb["sem"]))
+            df = max(1, min(sa["n"], sb["n"]) - 1)
+            half = se.t975(df) * sem
+            out.append(dict(point=r["label"], contrast=name, a=a, b=b,
+                            a_mean=sa["mean"], b_mean=sb["mean"], delta=d, sem=sem,
+                            lo=d - half, hi=d + half, resolved=bool(abs(d) > half)))
+    return out
 
 
 def rows(summary, n_boot=4000):
@@ -507,6 +627,9 @@ def rows(summary, n_boot=4000):
             label=point["label"], model=point["model"], role=point.get("role"),
             beta=point["beta"], nb=point["nb"], nk=point["nk"], n_ops=point["n_ops"],
             n_ranks=point["n_ranks"], m=point["m"], n_seeds=len(runs),
+            # Present only on sensitivity arms; None on headline points.
+            parent_label=point.get("parent"), knobs=point.get("knobs"),
+            arm_knobs=point.get("arm_knobs"), parent_knobs=point.get("parent_knobs"),
             R_full=_stat(Rf),
             R_full_boot=se.seed_bootstrap(Rf, n_boot=n_boot) if len(Rf) > 2 else None,
             R_nonnull=_stat([r["R_nonnull"] for r in runs]),
@@ -518,6 +641,7 @@ def rows(summary, n_boot=4000):
             orbits=bl.orbit_rho(runs),
             structure=pt["structure"],
             by_class=pt["by_class"],
+            class_stats=class_across_seed(pt),
             seed_spacing_violations=se.check_seed_spacing(runs),
             contamination_worst=max((se.contamination(r) for r in runs),
                                     key=lambda c: c.get("outlier") or 0, default=None),
@@ -572,6 +696,38 @@ def axis_pairs(rows_, axis, keys=("model", "beta", "nb", "nk", "n_ops")):
                                   resolved=bool(abs(d) > half))
             pairs.append(entry)
     return pairs
+
+
+def systematics(summary, n_boot=4000):
+    """Arm vs parent: the size of a nuisance-parameter effect, in the units the headline is quoted in.
+
+    Unpaired -- the arm draws its own disjoint seed range, so this is a two-sample difference, not
+    the paired depth check of milestone 6. `frac` is what a writeup actually needs: a systematic
+    worth disclosing is one that is large compared with the statistical error it sits beside, and
+    `resolved` says whether the arm even distinguishes the two settings at the seed count it was run
+    at. An UNRESOLVED systematic is not a licence to drop it -- at these seed counts it mostly means
+    the arm cannot pin the number, which is itself the disclosure.
+    """
+    parent_rows = {r["label"]: r for r in rows(summary, n_boot)}
+    out = []
+    for r in rows(dict(points=summary.get("arms") or []), n_boot):
+        parent = parent_rows.get(r.get("parent_label"))
+        if not parent:
+            continue
+        entry = dict(arm=r["label"], parent=parent["label"], knobs=r.get("knobs"),
+                     arm_knobs=r.get("arm_knobs"), parent_knobs=r.get("parent_knobs"),
+                     n_arm=r["n_seeds"], n_parent=parent["n_seeds"])
+        sa, sb = parent.get("R_full"), r.get("R_full")
+        if sa and sb:
+            d = sb["mean"] - sa["mean"]
+            sem = float(np.hypot(sa["sem"], sb["sem"]))
+            df = max(1, min(sa["n"], sb["n"]) - 1)
+            half = se.t975(df) * sem
+            entry["R_full"] = dict(parent=sa["mean"], arm=sb["mean"], delta=d, sem=sem,
+                                   lo=d - half, hi=d + half, resolved=bool(abs(d) > half),
+                                   frac=d / sa["mean"] if sa["mean"] else None)
+        out.append(entry)
+    return out
 
 
 # ---- tables ---------------------------------------------------------------------------------------
@@ -658,6 +814,55 @@ def binding_table(rows_):
     return "\n".join(out)
 
 
+def class_stats_table(rows_, mode="equivalence"):
+    """The class decomposition with across-seed errors -- the version a claim may be built on."""
+    out = []
+    for r in rows_:
+        cs = (r.get("class_stats") or {}).get(mode)
+        if not cs:
+            continue
+        out.append(f"  -- {r['label']}  ({mode}, n={r['n_seeds']} seeds) --")
+        out.append(f"  {'class':<30} {'n':>4} {'var share':>18} {'R_C':>20} {'mean m':>7}")
+        for name, v in cs.items():
+            rc = _fmt(v["R_C"], 3) if v["R_C"] else "inf (forced null)"
+            out.append(f"  {name:<30} {v['n']:>4} {_fmt(v['w'], 4):>18} {rc:>20} "
+                       f"{v['mean_m']:>7.2f}")
+        out.append("")
+    return "\n".join(out)
+
+
+def contrast_table(contrasts):
+    out = [f"  {'point':<20} {'contrast':<32} {'A':>8} {'B':>8} {'A - B':>24}",
+           "  " + "-" * 100]
+    for c in contrasts:
+        mark = "*" if c["resolved"] else " "
+        out.append(f"  {c['point']:<20} {c['contrast']:<32} {c['a_mean']:>8.3f} {c['b_mean']:>8.3f} "
+                   f"{c['delta']:+.3f} [{c['lo']:+.3f},{c['hi']:+.3f}]{mark}")
+    out.append("  (* = resolved against across-seed scatter; an interval spanning zero means the")
+    out.append("   predicted difference was NOT found, which is a result and not a null to bury)")
+    return "\n".join(out)
+
+
+def systematic_table(systs):
+    """Nuisance-parameter effects that a headline must be quoted WITH, not corrected by."""
+    out = [f"  {'arm':<26} {'parent':<20} {'knob':<28} {'dR':>24} {'% of R':>8}",
+           "  " + "-" * 112]
+    for s in systs:
+        knob = ", ".join(f"{k}: {s['arm_knobs'].get(k)} vs {s['parent_knobs'].get(k)}"
+                         for k in (s.get("knobs") or []))
+        v = s.get("R_full")
+        if not v:
+            out.append(f"  {s['arm']:<26} {s['parent']:<20} {knob:<28} {'n/a':>24}")
+            continue
+        mark = "*" if v["resolved"] else " "
+        out.append(f"  {s['arm']:<26} {s['parent']:<20} {knob:<28} "
+                   f"{v['delta']:+.4f} [{v['lo']:+.4f},{v['hi']:+.4f}]{mark} "
+                   f"{100 * v['frac']:>+7.1f}%")
+    out.append("  (* = resolved against across-seed scatter; unresolved means the arm cannot pin it,")
+    out.append("   NOT that the systematic is absent -- disclose it either way)")
+    return "\n".join(out)
+
+
 def axis_table(pairs):
     out = [f"  {'axis':<8} {'from':<20} {'to':<20} {'dR':>22} {'drho':>22}", "  " + "-" * 96]
     for p in pairs:
@@ -673,17 +878,30 @@ def axis_table(pairs):
 
 
 def report(summary, n_boot=4000):
-    rows_ = rows(summary, n_boot)
+    # A summary re-read from JSON already carries its reduced rows, and `--slim` has dropped the
+    # per-run fields they were derived from (`orbits`, the per-run class tables) -- so recomputing
+    # here raises KeyError on exactly the artifact this project commits. Prefer what was stored;
+    # `build` calls this before it stores anything, so a fresh build still computes.
+    rows_ = summary.get("rows") or rows(summary, n_boot)
     parts = ["=== model sweep: design points ===", point_table(rows_), "",
              "=== band-permutation content (is the band machinery live?) ===", permutation_table(rows_), "",
              "=== orbit sizes ===", orbit_size_table(rows_), "",
              "=== which ceiling binds ===", binding_table(rows_), "",
-             "=== class decomposition (equivalence-aware) ===", class_table(rows_, "equivalence"),
-             "=== class decomposition (per band pair) ===", class_table(rows_, "pair")]
+             "=== class decomposition (equivalence-aware, across seeds) ===",
+             class_stats_table(rows_, "equivalence"),
+             "=== class contrasts (the inequivalent-orbital control) ===",
+             contrast_table(class_contrasts(rows_)), "",
+             "=== class decomposition, single reference run (equivalence-aware) ===",
+             class_table(rows_, "equivalence"),
+             "=== class decomposition, single reference run (per band pair) ===",
+             class_table(rows_, "pair")]
     for axis in ("nb", "nk", "n_ops", "model"):
         pairs = axis_pairs(rows_, axis)
         if pairs:
             parts += [f"=== axis: {axis} ===", axis_table(pairs), ""]
+    systs = summary["systematics"] if "systematics" in summary else systematics(summary, n_boot)
+    if systs:
+        parts += ["=== systematics (sensitivity arms) ===", systematic_table(systs), ""]
     viol = [v for r in rows_ for v in (r.get("seed_spacing_violations") or [])]
     if viol:
         parts += ["!!! SEED SPACING VIOLATIONS -- intervals are void !!!", str(viol), ""]
@@ -746,10 +964,15 @@ def main(argv):
         print(text)
         summary["report"] = text
         summary["rows"] = rows_
+        summary["systematics"] = systematics(summary, n_boot=4000)
+        summary["class_contrasts"] = class_contrasts(rows_)
         if "--slim" in argv:
-            for pt in summary["points"]:
+            for pt in summary["points"] + summary.get("arms", []):
                 for r in pt["runs"]:
                     r.pop("orbits", None)
+                # The per-run class tables are already reduced into rows[].class_stats; keeping 88
+                # copies of them would triple the committed artifact for no added reproducibility.
+                pt.pop("by_class_runs", None)
         if "--out" in argv:
             out = argv[argv.index("--out") + 1]
             with open(out, "w") as f:

@@ -197,8 +197,10 @@ measured** (both beta ladders, 2026-07-28). The `m`-ceiling is ~3.0 for square a
 | model | `beta` | `1/rho` | binding |
 |---|---|---|---|
 | square | 1 -> 8 | 1.07 -> 1.79 | **`rho`, at every rung** |
+| square 8x8 | 5 | 1.88 (ceiling 4.62) | **`rho`** — a bigger cluster does not change the side (3c) |
 | FeAs | 1, 2 | 1.92, 2.28 | `rho` |
 | FeAs | 3, 4, 5 | 4.31, 8.70, **13.18** | **`m` (geometry)** |
+| threeband | 5 | 6.21 (ceiling 3.61) | **`m` (geometry)** — task 4, 2026-07-29 |
 
 So square never escapes being rho-limited over the range it was run: colder physics keeps paying
 there, and more symmetry still would not. FeAs **crosses over between beta=2 and beta=3** and ends
@@ -206,6 +208,12 @@ the ladder firmly m-limited — by beta=5 the noise structure would support a 13
 geometry can only cash 3.7x of it. The prescription flips with the crossover: below it, chase
 temperature; above it, chase orbit size (bigger cluster, larger point group, more equivalent bands).
 **Check which side you are on before spending anything** — this is a one-run diagnostic.
+
+**Multi-orbital models arrive on the `m`-limited side.** threeband at beta=5 is m-limited by a wide
+margin (`1/rho` = 6.21 against a 3.61 ceiling) at a temperature where single-band square is still
+rho-limited (1.51 against 2.97) — same beta, same mesh, same point group. So the crossover is not
+only a temperature effect: **band structure moves you across it too**, and the models people actually
+run DCA++ on are the ones that land on the side where more symmetry is what pays.
 
 ## 3a. `R` grows as you reach deeper into the interesting low-temperature physics
 
@@ -333,8 +341,11 @@ The open question this settles: **does `rho` fall with cluster size?** It decide
 | *efficiency (internal)* | *42.4%* | *32.5%* |
 | orbit sizes | `{1:2, 2:1, 4:3}` | `{1:2, 2:1, 4:9, 8:3}` |
 
-**Answer: yes.** `drho = -0.131` and `R` rises **19%** on a single axis -- only `Nc` changes, at fixed
-`beta`, band count, interaction and filling. This is the cleanest single-axis result in the project.
+**Answer: yes.** `drho = -0.1314 [-0.1473, -0.1155]` and `dR = +0.2387 [+0.2070, +0.2705]`, both
+resolved against the across-seed scatter -- `R` rises **19%** on a single axis, with only `Nc`
+changing at fixed `beta`, band count, interaction and filling. This is the cleanest single-axis
+result in the project, and the only pair in the task-4 sweep that `axis_pairs` will even emit: it is
+the one axis the model tree lets us move alone.
 
 **But the shape of it corrects the natural expectation, and that is the part worth saying.** The 8x8
 mesh delivers exactly what section 6 predicted it would: **three FREE `m=8` orbits**, which a 4x4 mesh
@@ -481,17 +492,96 @@ Structural support that survives the beta/band confound (see the caveat in 4a):
   At nb=1 those counts are 0 — the band machinery is entirely dormant.
 - 38% of FeAs entries (24/64) are symmetry-forced nulls: noise driven to exactly zero. Square: none.
 
-**Qualifier:** the gain comes from **symmetry-EQUIVALENT orbitals related by the point group**, not
-from orbital count. With inequivalent orbitals, `U_S` acts trivially on band indices, orbits collapse
-back to k-orbits, and there is no multi-orbital advantage at all.
+### Measured — the sweep at fixed β=5 (ROADMAP task 4, 2026-07-29)
+
+**The temperature confound is closed.** Square run at *FeAs's own* β gives `R = 1.2619 ± 0.0072`
+against FeAs's `2.9679 ± 0.0592` at the same β, same 4×4 mesh, same `|G| = 8`. The 2.35× gap between
+the project's two founding models is **not** a temperature artifact. 4a's caveat — that square and
+FeAs differ on four axes at once — is now retired for the temperature axis specifically.
+
+**The `nb` trend, measured (all at β=5, 4×4, |G|=8, 32 seeds):**
+
+| `nb` | model | **`R`** |
+|---|---|---|
+| 1 | square / D4 | **1.2619 ± 0.0072** |
+| 2 | FeAs 2-band | **2.9679 ± 0.0592** |
+| 3 | threeband (Emery d-p) | **3.2380 ± 0.0359** (± a −1.4% warm-up systematic, below) |
+
+`R` does grow with band count, and **it saturates hard**: `+1.71` from nb=1→2, then `+0.27` from
+2→3. Do not extrapolate this axis — the second band buys the effect, the third mostly buys index
+space. ⚠️ This is a **trend across models**, not a controlled axis: there is no such thing as the
+same lattice with a different band count, and `model_sweep.axis_pairs` accordingly emits **no** `nb`
+pair. The causal weight is carried by the within-model control below, not by this table.
+
+**The within-model control, which is the real evidence.** threeband's band-equivalence classes come
+out `[[0], [1, 2]]` — derived from `P`, never declared: d is alone, p_x ~ p_y, and exactly two band
+permutations are realized (identity and the p_x↔p_y transposition). So one run contains blocks the
+point group can permute and blocks it cannot, with β, `U`, filling and geometry held *exactly* fixed:
+
+| entry class | **`R_C`** | share of raw variance | mean `m` |
+|---|---|---|---|
+| diagonal, band-orbit 1 — d–d | **1.408 ± 0.010** | 5.7% | 3.38 |
+| diagonal, band-orbit >1 — p–p, p′–p′ | **2.513 ± 0.030** | 48.2% | 4.50 |
+| off-diagonal, inequivalent — d–p | **3.331 ± 0.031** | 15.1% | 5.00 |
+| off-diagonal, equivalent — p–p′ | **3.375 ± 0.049** | 10.6% | 5.56 |
+| symmetry-forced null | ∞ (noise → exactly 0) | 20.5% | 1.00 |
+
+32 seeds, `±` = standard error across seeds. The three contrasts, with 95% intervals:
+
+| contrast | result |
+|---|---|
+| off-diagonal: inequivalent − equivalent | `−0.045 [−0.163, +0.074]` — **not resolved** |
+| diagonal: band-orbit >1 − band-orbit 1 | `+1.105 [+1.039, +1.170]` — resolved |
+| off-diagonal equivalent − diagonal band-orbit 1 | `+1.967 [+1.864, +2.070]` — resolved |
+
+**The qualifier as previously written was wrong, and the corrected form is more useful.** The old
+claim was that inequivalent orbitals get *no* advantage — that `U_S` acts trivially, orbits collapse
+to k-orbits, and the benefit vanishes. The d–p block refutes that at the entry level: d and p are in
+**different** equivalence classes, yet d–p entries reduce as well as the equivalent p–p′ ones
+(`−0.045`, interval spanning zero). The mechanism is visible in the orbit sizes — d–p orbits average
+`m = 5.00`, **above the 4 that k-symmetry alone can reach on this mesh** — because the p_x↔p_y
+permutation maps the d–p_x block onto the d–p_y block. *An entry between inequivalent bands is still
+reachable by a band permutation.* "Inequivalent pair" ≠ "no band symmetry available".
+
+**The block that genuinely has no band symmetry is d–d**, the one class whose orbits are pure
+k-orbits (mean `m = 3.38`, exactly single-band square's). It lands at `1.408 ± 0.010` against square's
+`1.262 ± 0.007` at the same β and geometry — both ≈1.3, and a factor 1.8–2.4 below *every*
+permutation-reachable block. (The residual 0.15 between them is a `ρ` difference between two
+different models, not an orbit-size effect: the mean `m` is identical.) So the qualifier survives in
+its corrected form:
+
+> The gain comes from symmetry-equivalent orbitals — but **a single equivalent pair anywhere in the
+> model lifts every block that pair touches**, including blocks involving the inequivalent orbitals.
+> Only blocks the permutation cannot reach at all stay at the single-band value.
+
+**This widens the claim rather than narrowing it.** A material does not need all its orbitals
+equivalent to benefit; most of the index space of a realistic multi-orbital model is lifted by
+whatever equivalent pair the point group does supply. And the ordering the mechanism predicts is
+recovered cleanly and separably: off-diagonal (3.33–3.38) > band-diagonal but permutable (2.51) >
+band-diagonal and unreachable (1.41).
+
+**Where threeband's aggregate `R` actually comes from** — and why the aggregate is the wrong number
+to quote. Nearly half the raw variance (48.2%) sits in the band-diagonal p blocks at `R_C = 2.51`,
+and a further 20.5% in forced nulls. The two off-diagonal classes, which reduce best, carry only
+25.7% between them. `R_nonnull = 2.5741 ± 0.0254` against `R_full = 3.2380 ± 0.0359`: a fifth of the
+headline is noise driven to exactly zero on symmetry-forbidden entries.
+
+**Disclosed systematic on the threeband point.** It runs at warm-up 8000, not the Conventions' 200,
+because at 200 its chain is not thermalized (see ROADMAP task 4, gate 3). Where warm-up *converges*
+is not established, so an 8-seed arm at warm-up 2000 measures the residual dependence:
+`ΔR = −0.0441 [−0.2269, +0.1388]`, i.e. **−1.4%, not resolved at n=8**. Quote it beside `R`; it is of
+the same order as the ±1.1% statistical error and is disclosed, not corrected for.
 
 **Reporting consequence:** aggregate `R` is variance-weighted and therefore dominated by the noisy,
 local-dominated, band-diagonal entries that symmetrization helps LEAST. **The current headline number
 actively hides the selling point** — FeAs's 3.04 is diluted by exactly the components nobody runs a
 two-band calculation to look at. Split `R` by entry class (see 4b).
 
-**Testable prediction:** `R` should grow with the number of symmetry-equivalent orbitals
-(nb=1 -> 1.04, nb=2 -> 3.04, nb=3 -> ?).
+**Prediction, now measured** (was: "`R` should grow with the number of symmetry-equivalent orbitals,
+nb=1 -> 1.04, nb=2 -> 3.04, nb=3 -> ?"). At a common β=5 it is **1.26 -> 2.97 -> 3.24**: the
+direction holds, the magnitude saturates after the second band, and the *entry-class* form of the
+prediction needed the correction above. Evidence: the sweep block earlier in this section and
+`06_model_sweep.ipynb`.
 
 **A second, competing channel — a finding in its own right.** G is estimated as `<sign*M>/<sign>`. A
 fluctuation in the denominator is a GLOBAL SCALAR, giving `delta G(k) = -G(k) * delta s/s` with
