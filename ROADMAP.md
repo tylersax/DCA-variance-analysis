@@ -535,6 +535,57 @@ faster for free. Hardware if needed: 4× RTX A5000 (24 GB, idle), CUDA 12.2, `-D
 `CUDA_GPU_ARCH=sm_86`; `symm_variance_setup.hpp` already selects `linalg::GPU` under `DCA_HAVE_GPU`.
 
 
+#### ▶ RESUMING TASK 4 — read this first (handoff written 2026-07-29)
+
+**Where the work lives.** Not on `main`. Everything below is on branch
+**`worktree-task4-model-sweep`** (pushed), in worktree
+`/home/tsax10/dca/analysis/.claude/worktrees/task4-model-sweep`, built at
+**`/home/tsax10/dca/build_task4`**. ⚠️ `build_symm` is configured against the *main* checkout and does
+**not** have the `threeband`/`kagome` targets — using it will silently run the old binaries. There is
+**no PR**: `gh` is not installed on this box; open it at
+`https://github.com/tylersax/DCA-variance-analysis/pull/new/worktree-task4-model-sweep`.
+
+**Run state.** `symm_variance/run_model_sweep_ensembles.sh` drives gate 4 sequentially and every step
+is skip-if-exists, so **just re-run it to resume** — it will no-op the finished points.
+
+| ensemble | state | result |
+|---|---|---|
+| `square_b5_c4`, 32 seeds | ✅ done | `R` = 1.2619 ± 0.0072 |
+| `square_b5_c8`, 16 seeds | ✅ done | `R` = 1.5006 ± 0.0130 |
+| `threeband_b5_c4_w2000`, 8 seeds | ✅ done | the warm-up sensitivity arm, not a headline |
+| `threeband_b5_c4`, 32 seeds | ⏳ 23/32 at 12:30 | ~19 min/run; the long one |
+
+Raw HDF5s are in `/home/tsax10/dca/scratch/model_sweep/` (uncommitted, ~30 MB each). Floor ladders are
+in `/home/tsax10/dca/scratch/task4_floor/`, the warm-up study in `/home/tsax10/dca/scratch/task4_warmup/`.
+
+**What remains, in order:**
+1. Let the threeband ensemble finish (re-run the chain script if it was interrupted).
+2. `cd symm_variance/analysis && python model_sweep.py build ../runs/model_sweep_manifest.json --out ../runs/model_sweep.json --slim`
+   — **budget ~10–15 min**, measured; cost scales with `E = nb²·nk`, so threeband (E=144, ~8–14 s/run)
+   dominates. `--boot 100` only saves ~28% and is not worth degrading the diagnostic.
+3. **TAKEAWAYS §4c — the nb trend.** This is the task's headline claim and the *only* thing genuinely
+   gated on threeband's number. Replace the open prediction `nb=1 → 1.04, nb=2 → 3.04, nb=3 → ?` with
+   measured values at fixed β=5, and state which points share `|G|` and which do not.
+   **Quote the warm-up systematic beside `R`** (below) — it exceeds the statistical error.
+4. Notebook **`06_model_sweep.ipynb`** via `build_notebooks.py`, then re-execute *every* notebook and
+   check `execution_count` per cell (Gotcha 12).
+5. Commit, push, open the PR.
+
+**Three things a fresh session must not re-derive or get wrong:**
+- **threeband runs at warm-up 8000, not the Conventions' 200** (`MU=3.0`, `U_pp=2`). The manifest and
+  `model_sweep.plan` already emit this; `verify_point` will *raise* if a run's metadata disagrees.
+- **The warm-up systematic is disclosed, not resolved.** 2000 → 8000 moved `R` by −0.096 ± 0.021 at
+  n=3, which Conventions say not to believe on a sign-problem model. That is what the 8-seed
+  `threeband_b5_c4_w2000` arm is for — compute the difference at n=8 and quote it as a systematic
+  (~2.8%, larger than the across-seed error).
+- **Kagome is out of scope** (DCA-side segfault, diagnosed in the manifest's `blocked_points`). Do not
+  retry it; the `.cpp` and template are kept only so the attempt is not repeated from scratch.
+
+**Task 5 is independent of all of this** — see its section for the corrected notebook number (**07**)
+and the three input caveats. If working it in parallel, branch a *separate* worktree off
+`worktree-task4-model-sweep` (not `main`, which lacks the corrected guidance); the only merge
+collision is `build_notebooks.py`, where 06 and 07 both append blocks.
+
 #### Progress (2026-07-28): infrastructure + gates 0–2 done, ensembles outstanding
 
 **Scope, chosen with the advisor:** four measured points at fixed **β=5** — `square_b5_c4` (keystone),
