@@ -624,7 +624,33 @@ the 4 h budget rule, so the manifest cuts it to **16 seeds (~3.1 h)**.
 | point | floor | evidence |
 |---|---|---|
 | `square_b5_c4` | **≤512/rank** | every step flat in all 3 seeds; ⟨s⟩ = 1.0000 exactly; `R` ≈ 1.25 |
-| `threeband_b5_c4` | 2048/rank **at warm-up 2000** | see the thermalization finding below |
+| `square_b5_c8` | **≤512/rank** | every step flat in all 3 seeds; ⟨s⟩ = 1.0000; outlier 1.02 |
+| `threeband_b5_c4` | 2048/rank **at warm-up 8000** | see the thermalization finding below |
+
+**The cluster-size question is ANSWERED: `ρ` falls with `Nc`** (3 seeds at m=8192, ≫ the ≤512 floor,
+sign-free, so this is well controlled even before the ensembles pin it):
+
+| | 4×4 (nk=16) | 8×8 (nk=64) |
+|---|---|---|
+| **`R`** | 1.2506 ± 0.0013 | **1.4014 ± 0.0026** |
+| **`ρ` (mates)** | 0.6777 ± 0.0013 | **0.5777 ± 0.0012** |
+| `1/ρ` | 1.48 | 1.73 |
+| `R_ideal` (m-ceiling) | 3.015 | 4.611 |
+| efficiency | 41.5% | **30.4%** |
+| orbit sizes | `{1:2, 2:1, 4:3}` | `{1:2, 2:1, 4:9, 8:3}` |
+
+So the roadmap's open question — *does `ρ` fall with cluster size?*, which decides whether the
+m-ceiling is reachable in practice — gets **yes**: `Δρ = −0.100`, and `R` rises 12%.
+
+**But the shape of the answer matters more than the sign, and it cuts against the obvious reading.**
+Both ceilings rise, and the m-ceiling rises *faster*: 3.02 → 4.61 (the three **free** `m=8` orbits that
+only exist at 8×8, TAKEAWAYS §6) against `1/ρ` 1.48 → 1.73. Square stays **ρ-limited at both sizes**
+(1.48 < 3.02 and 1.73 < 4.61), so **efficiency falls, 41.5% → 30.4%**. The bigger cluster does help —
+but it helps through the *noise structure*, not through the larger orbits it unlocks, because those
+orbits cannot be cashed while `ρ` still binds. Stated for a practitioner: *on square at β=5, buying a
+bigger cluster buys you a better `ρ`, and the extra orbit structure you also bought sits idle.*
+Whether a model that is already m-limited (FeAs at β≥3) converts the 8×8 orbit structure into `R` is
+the obvious follow-on and is **not** answered here.
 
 Square's β=5 `R` ≈ **1.25** sits between the committed β=4 (1.2122) and β=8 (1.3429) rungs — a free
 consistency check on the whole pipeline at a temperature it had never been run at.
