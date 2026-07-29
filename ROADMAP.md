@@ -619,10 +619,42 @@ pinned against FeAs's known 125 s at 64×2048 (its scout took 9 s). A 32-seed en
 Budgets follow: square β=5 **~15 min**, threeband **~1.9 h**, square 8×8 **6.2 h at 32 seeds** — over
 the 4 h budget rule, so the manifest cuts it to **16 seeds (~3.1 h)**.
 
-**What remains: gates 3 and 4.** Floor ladders per point (`model_sweep.py plan --mode floor`), then the
-32-seed ensembles (`--mode ensemble`), then `model_sweep.py build`, notebook 06, and the TAKEAWAYS
-edits. A threeband floor ladder was started (`/home/tsax10/dca/scratch/task4_floor/`); it is
-skip-if-exists and resumable, so re-running the planned command is safe. **The build to use is
+**Gate 3 (depth floors) — measured 2026-07-28, and it forced a Convention change on threeband.**
+
+| point | floor | evidence |
+|---|---|---|
+| `square_b5_c4` | **≤512/rank** | every step flat in all 3 seeds; ⟨s⟩ = 1.0000 exactly; `R` ≈ 1.25 |
+| `threeband_b5_c4` | 2048/rank **at warm-up 2000** | see the thermalization finding below |
+
+Square's β=5 `R` ≈ **1.25** sits between the committed β=4 (1.2122) and β=8 (1.3429) rungs — a free
+consistency check on the whole pipeline at a temperature it had never been run at.
+
+⚠️ **A "depth floor" can be a THERMALIZATION artifact, and on threeband it was.** The first threeband
+ladder looked like an unconverged floor: `R` = 2.9653 ± 0.0055 at m=2048 rising to 3.3218 ± 0.0089 at
+m=8192, with the 2048→8192 step resolved in **all three** seeds. Two things said this was not the
+sign problem — ⟨s⟩ = 0.60 and the outlier index *fell* to **1.06**, cleaner conditioning than FeAs ever
+had — and `R` converged from **below**, opposite to the upward bias square and FeAs show below their
+floors (TAKEAWAYS §1a). Raising **warm-up 200 → 2000 at fixed m=2048** moves `R` by **+0.407**,
+reproducing the +0.357 that 4× depth bought and landing within **0.05** of the deep run
+(3.3724 ± 0.0203 vs 3.3218 ± 0.0089). The chain was simply not thermalized; extra depth was diluting
+an unthermalized prefix rather than curing it.
+
+- **This overrides "warm-up 200 everywhere" for threeband only.** The Convention was established on
+  square and FeAs; threeband's expansion order (`U_dd = 8` across 3 bands) is far larger. Square at
+  the *same* β shows every depth step flat at warm-up 200, which is the control that makes this
+  model-specific rather than a general flaw.
+- **This is a mechanism, not just an observation** — unlike the FeAs warm-up entry in Conventions
+  ("flat then a step is the wrong shape for smooth thermalization"). Here raising warm-up at fixed
+  depth reproduces the effect of raising depth at fixed warm-up, which is precisely what an
+  unthermalized prefix predicts.
+- **Diagnostic rule worth keeping:** if `R` rises with depth while the outlier index *falls*, suspect
+  thermalization before buying more depth. Testing warm-up at fixed depth costs a fraction of the next
+  depth rung — here 3 runs (~17 min) against a 32768/rank ladder that would have been ~2.5 h and, at
+  ensemble scale, 26 h and unaffordable.
+
+**What remains: gate 4.** The 32-seed ensembles (`model_sweep.py plan --mode ensemble`), then
+`model_sweep.py build`, notebook 06, and the TAKEAWAYS edits. All ladders are skip-if-exists and
+resumable, so re-running a planned command is always safe. **The build to use is
 `/home/tsax10/dca/build_task4`** (configured against this worktree); `build_symm` still targets the
 main checkout and does not have the new targets.
 

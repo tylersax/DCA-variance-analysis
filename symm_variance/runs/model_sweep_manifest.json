@@ -33,9 +33,22 @@
     {
       "label": "threeband_b5_c4",
       "model": "threeband", "beta": 5, "L": 4, "nk": 16, "nb": 3, "n_ops": 8,
-      "m": 4096, "seed0": 21000000, "mesh": "square", "chemical_potential": 3.0,
-      "blocks": {"dd": [0, 0, 0], "dpx": [0, 1, 0], "pxpx": [1, 1, 0], "pxpy": [1, 2, 0]},
-      "scout_seconds": 15, "est_run_seconds": 208, "est_ensemble_hours": 1.85,
+      "m": 2048, "seed0": 21000000, "mesh": "square", "chemical_potential": 3.0,
+      "warm_up_sweeps": 2000,
+      "__warmup_note__": [
+        "2000, NOT the Conventions' 200 -- measured, ROADMAP task 4 gate 3, 2026-07-28. At warm-up",
+        "200 threeband's depth ladder appeared to drift (R = 2.965 at m=2048 -> 3.322 at m=8192,",
+        "the 2048->8192 step resolved in all 3 seeds), which reads as an unconverged depth floor.",
+        "It is not: raising warm-up 200 -> 2000 at FIXED m=2048 moves R by +0.407, reproducing the",
+        "+0.357 that 4x depth bought, and lands within 0.05 of the deep run. The chain was simply",
+        "not thermalized, and extra depth was diluting an unthermalized prefix rather than fixing",
+        "it. Square at the same beta shows no such effect (every depth step flat at warm-up 200),",
+        "so this is specific to threeband's much larger expansion order (U_dd = 8 across 3 bands),",
+        "not a general flaw. Unlike the FeAs warm-up observation in Conventions -- 'flat then a",
+        "step is the wrong shape for smooth thermalization' -- the shape here is exactly what an",
+        "unthermalized prefix predicts, so this is a mechanism, not just an observation."
+      ],
+      "scout_seconds": 15, "est_run_seconds": 343, "est_ensemble_hours": 3.05,
       "role": "The nb=3 point AND the inequivalent-orbital control in one run. Measured band-equivalence classes [[0],[1,2]]: d inequivalent, p_x ~ p_y equivalent, and exactly two realized band permutations (identity and the p_x<->p_y transposition, no d<->p). Requires U_pp = 2 and mu = 3 -- see the template's operating-point note; at U_pp = 0 the p-block G is deterministic and the run measures nothing."
     },
     {

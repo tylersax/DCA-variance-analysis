@@ -704,6 +704,14 @@ def plan(man, mode):
             env += f" CLUSTER={p['L']}"
         if p.get("nw"):
             env += f" NW={p['nw']}"
+        # Conventions fix warm-up at 200 and the templates carry it, so it is normally NOT passed.
+        # A point may override it only where thermalization was MEASURED to demand more (threeband
+        # -- see its manifest note); verify_point then checks the run's metadata against this value,
+        # so a mismatch between what is planned and what is declared is caught rather than averaged in.
+        if p.get("warm_up_sweeps") and int(p["warm_up_sweeps"]) != 200:
+            env += f" WARMUP={p['warm_up_sweeps']}"
+        if p.get("chemical_potential") is not None:
+            env += f" MU={p['chemical_potential']}"
         stride = p.get("stride", 10000)
         if mode == "scout":
             d = os.path.join(man["root"] + "_scout", p["label"])
