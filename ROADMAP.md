@@ -47,11 +47,18 @@ target: threeband is m-limited at β=5.
 | square / D4, β=1 | **1.0425 ± 0.0013** | m = 1, 2, 4 | ~0.94 | ≈64 — autocorrelation |
 | square / D4, β=8 | **1.3429 ± 0.0088** | m = 1, 2, 4 | ~0.56 | ≈256 — autocorrelation |
 | FeAs 2-band, β=5 | **3.042 ± 0.049** | m = 2, 4, 8 (+24 forced nulls) | ~0.06 | ≳1000 — **sign problem** |
+| threeband, β=5 | **3.2380 ± 0.0359** | m = 1, 2, 4, 8 (+30 forced nulls) | ~0.16 | 2048 at warm-up **8000** |
+| square / D4 8×8, β=5 | **1.5006 ± 0.0130** | m = 1, 2, 4, 8 | ~0.53 | ≤512 — sign-free |
 
-**32 independent base seeds × 64 ranks × 2048 measurements/rank**, 4×4 clusters, **single DCA
-iteration at the bare (Σ=0) bath** — see the bath convention below, and §3e for the measurement that
-these numbers transfer to the bath a production run actually samples; `±` = standard error over seeds
-(95% t-CI: square `[1.0398, 1.0452]`, FeAs
+**threeband is the project's largest `R`** (task 4, 2026-07-29) — but quote it with its **−1.4%
+warm-up systematic**, and note that 20.5% of its raw variance is symmetry-forced nulls
+(`R_nonnull` = 2.5741 ± 0.0254). It is also the one model here that is **m-limited**: `1/ρ` = 6.21
+against a 3.61 ceiling, so its noise structure would support ~6× if the 4×4 geometry could cash it.
+
+**32 independent base seeds × 64 ranks × 2048 measurements/rank**, 4×4 clusters (the 8×8 row is 16
+seeds on an 8×8 cluster), **single DCA iteration at the bare (Σ=0) bath** — see the bath convention
+below, and §3e for the measurement that these numbers transfer to the bath a production run actually
+samples; `±` = standard error over seeds (95% t-CI: square `[1.0398, 1.0452]`, FeAs
 `[2.943, 3.141]`). FeAs declares 2 ops → derives 8. Validation rungs pass on both models: singletons
 pin at exactly `r=1`, per-orbit `r` matches `m/[1+(m−1)ρ]`, `r` flat in ω, mean preservation vs
 production to 2e-16. Evidence and mechanism: **TAKEAWAYS §1a** and `03_m_scaling.ipynb`; the
@@ -473,11 +480,16 @@ is isolated from that — the same reason it was the right first target.
 
 
 
-### 4. Broaden model coverage — vary ONE axis at a time  ▸ carries the headline claim
+### 4. Broaden model coverage — vary ONE axis at a time  ▸ DONE (2026-07-29), and it corrected the claim
 
 **The claim this task establishes:** symmetrization pays off most where the physics is most
 interesting — multi-orbital models, and *within* them the interband components that carry the
 distinctive physics. See TAKEAWAYS §4c.
+
+> **Measured. Read the result block below before this framing** — the framing is kept because it is
+> what the design was built from, but two of its statements did not survive contact with the data:
+> the inequivalent-orbital run was predicted to show the benefit *vanish* and it does not, and the
+> `nb` axis turned out not to be a controllable axis at all. Both are recorded in place.
 
 **The β ladders now point at this task with a measurement, not a hunch** (2026-07-28). Which ceiling
 binds *moves with the regime*: square stays ρ-limited at every β it was run (`1/ρ` only reaches 1.79
@@ -490,21 +502,30 @@ square 4×4 has no m=8 orbit at all (orbit size is `|G|/|stabilizer|`, and every
 has a nontrivial stabilizer — the first free orbit-8 k-point needs 8×8). Reaching a higher ceiling
 means the variance has to *live* in large orbits, which is what this task should test first.
 
-**Four runs turn that framing into a defensible claim:**
+**Four runs turn that framing into a defensible claim** — and what each actually returned:
 
-| run | establishes |
-|---|---|
-| single-band square at FeAs's β | **the keystone** — de-confounds temperature from band count. Task 2 already brackets it: square reaches `R = 1.34` at β=8 against FeAs's 3.04 at β=5, so **temperature alone does not account for the gap** — but run β=5 itself to close it cleanly |
-| a 3-orbital model | the trend in `nb`; exercises `U_S` as a genuine permutation, not a swap |
-| an inequivalent-orbital model | benefit should **vanish** — confirms the gain comes from symmetry-*equivalent* orbitals, not orbital count |
-| `R` split by entry class, on all of the above | surfaces the interband concentration that aggregate `R` buries |
+| run | was to establish | **result** |
+|---|---|---|
+| single-band square at FeAs's β | **the keystone** — de-confounds temperature from band count | ✅ **closed.** `R` = 1.2619 ± 0.0072 at β=5 against FeAs's 2.9679 ± 0.0592. Temperature does not account for the gap |
+| a 3-orbital model | the trend in `nb`; exercises `U_S` as a genuine permutation, not a swap | ✅ threeband `R` = 3.2380 ± 0.0359; `U_S` confirmed as a real permutation (2 realized: identity and p_x↔p_y) |
+| an inequivalent-orbital model | benefit should **vanish** | ❌ **prediction not borne out.** d–p entries are inequivalent by band class yet match the equivalent block (`−0.045 [−0.163, +0.074]`). The block that *is* unreachable — d–d — does behave as predicted (1.408 ± 0.010 vs square's 1.262 ± 0.007). See TAKEAWAYS §4c for the corrected form |
+| `R` split by entry class, on all of the above | surfaces the interband concentration that aggregate `R` buries | ✅ and it is large: off-diagonal ≈3.33–3.38 vs band-diagonal-unreachable 1.41, inside one model |
 
 Prediction to test: `R` grows with the number of symmetry-equivalent orbitals
-(nb=1 → 1.04, nb=2 → 3.2, nb=3 → ?).
+(nb=1 → 1.04, nb=2 → 3.2, nb=3 → ?). ▸ **Measured at a common β=5: 1.26 → 2.97 → 3.24.** Direction
+holds; magnitude **saturates** (+1.71, then +0.27). ⚠️ And this is a *trend*, not a controlled axis —
+`nb` cannot move without the model moving with it, which `axis_pairs` enforces by refusing to emit an
+`nb` pair at all. The causal weight sits in the within-model class contrast instead.
 
 **Design constraint (important):** square and FeAs differ in β, band count, interaction and filling
 *simultaneously*, so the ρ difference between them **cannot be attributed to any single cause**. The
 mechanism is measured; the causation is not. The sweep must isolate axes.
+
+> ▸ **Partly resolved.** The β axis is now held fixed across every point (all at β=5), so
+> **temperature is de-confounded**. Band count, `U` and filling still move together — no model tree
+> can separate them — so the sweep answers this by moving the comparison *inside* one model, where
+> all three are fixed by construction. That is why the entry-class contrast, not the cross-model
+> table, is what the claim rests on.
 
 Axes, and which knob in `r = m/[1+(m−1)ρ]` each moves:
 
@@ -518,11 +539,17 @@ Axes, and which knob in `r = m/[1+(m−1)ρ]` each moves:
 | band-diagonal vs interband entries | `ρ` | interband has no local scalar channel |
 
 - Open empirical question: **does `ρ` fall with cluster size?** That decides whether the `m`-ceiling
-  is reachable in practice.
+  is reachable in practice. ▸ **ANSWERED: yes.** `Δρ = −0.1314 [−0.1473, −0.1155]` over 4×4 → 8×8 at
+  fixed β, band count, `U` and filling — resolved, and the only genuine single-axis pair in the
+  sweep. But the `m`-ceiling rose *faster* than the reduction did, so square stays ρ-limited at both
+  sizes and the three new `m`=8 orbits sit idle (TAKEAWAYS §3c). Whether an *already* m-limited model
+  cashes them is untested and is the sharpest remaining follow-on.
 - Needs a sweep driver + results aggregator; record per-orbit `m`, `ρ`, `r`, the headline `R`, and
   the mechanism diagnostics for every run. **Record `w_null` and non-null `R` here specifically** —
   this is the task where they earn their place (see Conventions). Efficiency stays in the aggregator
-  as a dev diagnostic only.
+  as a dev diagnostic only. ▸ **Built** (`analysis/model_sweep.py`, `runs/model_sweep.json`); `w_null`
+  and `R_nonnull` are in the point table, and they earned it — threeband's forced nulls carry 20.5%
+  of raw variance, so `R_full` = 3.238 against `R_nonnull` = 2.574.
 - ⚠️ **Check what CT-AUX actually simulates before adding a multi-orbital model.** It silently drops
   spin-flip (`J`) and pair-hopping (`Jp`) terms — see Gotchas — so `fe_as`, `hund_lattice`,
   `La3Ni2O7_bilayer` and `twoband_Cu` all run as density-density models regardless of input.
@@ -767,6 +794,32 @@ reports `1/ρ` against each point's m-ceiling. Pick the model that is still **ρ
 model already m-limited (FeAs by β=3) gains little from more β. Costs a β ladder plus per-rung floor
 ladders on one model. Note kagome — the likely winner on m-ceiling — is blocked above, so on current
 evidence this is threeband or the 8×8 square.
+
+▸ **The sweep has now answered it, and the answer splits** (2026-07-29):
+
+| point | `1/ρ` | m-ceiling | binds |
+|---|---|---|---|
+| square 4×4 | 1.51 | 2.97 | ρ |
+| **square 8×8** | **1.88** | **4.62** | **ρ** |
+| threeband 4×4 | 6.21 | 3.61 | m |
+
+By the stated rule the pick is **square 8×8** — the only point that is still ρ-limited *and* has the
+largest ceiling. But that collides with this section's own title: the model that **maximizes `R`** is
+threeband (3.24), and threeband is m-limited, so colder physics is precisely what will *not* help it.
+The two criteria select different models, and that is a real finding rather than an ambiguity to
+split: **"push β" and "maximize R" have come apart.**
+
+**What the data actually points at is a third run neither criterion names: threeband on 8×8.** It is
+m-limited by a wide margin (noise structure supporting 6.2× against a geometry that cashes 3.6×), so
+it is starved of exactly what a bigger cluster supplies — and §3c flagged that no model tested so far
+can show whether an already-m-limited model converts 8×8 orbit structure into `R`. threeband would.
+
+⚠️ **Cost makes that the blocker, and it re-opens the GPU question.** Extrapolating the measured
+square 4×4 → 8×8 factor (~25×) onto threeband's measured 343 s/run gives **~2.4 h per run**, i.e.
+~38 h even at 16 seeds — far past the 4 h budget rule, and an extrapolation across models rather than
+a measurement, so scout it before believing it. This is exactly the trigger §4 set for revisiting
+GPU ("if this task commits to 8×8, build once and benchmark a single 8×8 run CPU vs GPU before
+committing the sweep; under ~3×, skip it").
 
 #### Starting this task cold — what a fresh session needs (written 2026-07-28, at the close of §3e)
 
