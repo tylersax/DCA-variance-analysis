@@ -8,3 +8,5 @@ build*/
 __pycache__/
 # Jupyter checkpoints
 .ipynb_checkpoints/
+# Claude Code session state (settings, worktrees) -- local only
+.claude/
