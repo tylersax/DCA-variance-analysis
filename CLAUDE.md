@@ -29,9 +29,11 @@ Corollaries:
 
 ## Things that have cost time before
 
-- **Never hand-edit the notebooks.** Edit `symm_variance/analysis/build_notebooks.py`, regenerate,
-  then re-execute *every* notebook — the builder rewrites all of them and clears outputs. Verify by
-  counting `execution_count` per cell; nbconvert can exit 0 having executed nothing.
+- **Never hand-edit the working-tier notebooks.** Edit `symm_variance/analysis/build_notebooks.py`,
+  regenerate, then re-execute *every* notebook — the builder rewrites all of them and clears outputs.
+  Verify by counting `execution_count` per cell; nbconvert can exit 0 having executed nothing.
+  **Exception: `hero/symmetrization_variance.ipynb`.** As of 2026-07-31 it is edited directly and is
+  its own source; its builder is retired in `hero/attic/` and must not be run. See `hero/README.md`.
 - **Check `uptime` before launching runs.** This is a shared 128-core box.
 - **Point run output at `/home/tsax10/dca/scratch/`** and commit only the summary JSON. A 64-rank run
   is 17–77 MB.

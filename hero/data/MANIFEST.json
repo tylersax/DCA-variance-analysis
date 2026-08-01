@@ -1,0 +1,94 @@
+{
+  "runs": {
+    "square_b5_c4": {
+      "file": "data/runs/square_b5_c4.hdf5",
+      "source": "/home/tsax10/dca/scratch/model_sweep/square_b5_c4/square_r64_m2048_s20000000.hdf5",
+      "size_mb": 8.6,
+      "n_ranks": 64,
+      "n_ops": 8,
+      "beta": 5.0,
+      "seed": 20000000,
+      "measurements_per_rank": 2048,
+      "measurements_total": 131072,
+      "warm_up_sweeps": 200,
+      "nb": 1,
+      "nk": 16
+    },
+    "fe_as_b5_c4": {
+      "file": "data/runs/fe_as_b5_c4.hdf5",
+      "source": "/home/tsax10/dca/scratch/seed_ensemble/fe_as_r64_m2048_s1000000.hdf5",
+      "size_mb": 34.2,
+      "n_ranks": 64,
+      "n_ops": 8,
+      "beta": null,
+      "seed": 1000000,
+      "measurements_per_rank": 2048,
+      "measurements_total": 131072,
+      "warm_up_sweeps": null,
+      "nb": 2,
+      "nk": 16
+    }
+  },
+  "ops": {
+    "threeband_b5_c4": {
+      "file": "data/ops/threeband_b5_c4.npz",
+      "source": "/home/tsax10/dca/scratch/model_sweep/threeband_b5_c4/threeband_r64_m2048_s21000000.hdf5",
+      "size_kb": 2.7,
+      "nb": 3,
+      "nk": 16,
+      "n_ops": 8,
+      "n_ranks": 64,
+      "beta": 5.0,
+      "model": "threeband"
+    },
+    "square_b5_c8": {
+      "file": "data/ops/square_b5_c8.npz",
+      "source": "/home/tsax10/dca/scratch/model_sweep/square_b5_c8/square_r64_m2048_s22000000.hdf5",
+      "size_kb": 2.3,
+      "nb": 1,
+      "nk": 64,
+      "n_ops": 8,
+      "n_ranks": 64,
+      "beta": 5.0,
+      "model": "square_D4"
+    }
+  },
+  "summaries": {
+    "seed_ensemble_square.json": {
+      "file": "data/summaries/seed_ensemble_square.json",
+      "source": "/home/tsax10/dca/analysis/symm_variance/runs/seed_ensemble_square.json",
+      "size_kb": 115.8
+    },
+    "seed_ensemble_fe_as.json": {
+      "file": "data/summaries/seed_ensemble_fe_as.json",
+      "source": "/home/tsax10/dca/analysis/symm_variance/runs/seed_ensemble_fe_as.json",
+      "size_kb": 176.3
+    },
+    "model_sweep.json": {
+      "file": "data/summaries/model_sweep.json",
+      "source": "/home/tsax10/dca/analysis/symm_variance/runs/model_sweep.json",
+      "size_kb": 393.1
+    },
+    "beta_ladder_square.json": {
+      "file": "data/summaries/beta_ladder_square.json",
+      "source": "/home/tsax10/dca/analysis/symm_variance/runs/beta_ladder_square.json",
+      "size_kb": 374.3
+    },
+    "beta_ladder_fe_as.json": {
+      "file": "data/summaries/beta_ladder_fe_as.json",
+      "source": "/home/tsax10/dca/analysis/symm_variance/runs/beta_ladder_fe_as.json",
+      "size_kb": 740.8
+    },
+    "m_scaling_summary.json": {
+      "file": "data/summaries/m_scaling_summary.json",
+      "source": "/home/tsax10/dca/analysis/symm_variance/runs/m_scaling_summary.json",
+      "size_kb": 109.7
+    },
+    "bath_drift_square.json": {
+      "file": "data/summaries/bath_drift_square.json",
+      "source": "/home/tsax10/dca/analysis/symm_variance/runs/bath_drift_square.json",
+      "size_kb": 293.4
+    }
+  },
+  "note": "Written by stage_data.py. Sources are paths on the machine the measurements were made on; they are recorded for provenance, not needed to run the notebook."
+}
